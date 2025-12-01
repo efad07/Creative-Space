@@ -9,6 +9,12 @@ export interface MediaItem {
   likes: number;
   views: number;
   likedByUser: boolean;
+  // Author info
+  userId?: string;
+  authorName?: string;
+  authorAvatar?: string;
+  // Optional blob for storage handling
+  blob?: Blob;
 }
 
 export interface ToastMessage {
@@ -30,4 +36,10 @@ export interface BlogPostData {
   date: string;
   author: string;
   readTime: string;
+}
+
+export interface User {
+  name: string;
+  email: string;
+  avatar?: string;
 }
