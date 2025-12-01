@@ -171,12 +171,25 @@ export const deleteMediaItemFromDB = async (id: string) => {
   });
 };
 
-export const clearAllMediaFromDB = async () => {
+// Only delete items belonging to the specific user
+export const deleteUserMediaFromDB = async (userId: string) => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction([STORE_MEDIA], 'readwrite');
     const store = transaction.objectStore(STORE_MEDIA);
-    store.clear();
+    const cursorRequest = store.openCursor();
+
+    cursorRequest.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+            const item = cursor.value as MediaItem;
+            if (item.userId === userId) {
+                cursor.delete();
+            }
+            cursor.continue();
+        }
+    };
+
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });

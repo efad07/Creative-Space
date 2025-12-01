@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from 'react';
 import { Camera, Trash2, Upload, Edit2, Check, X, Sparkles } from 'lucide-react';
 import { HeaderConfig } from '../types';
@@ -89,13 +90,13 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
                   <div className="flex gap-4 mt-6">
                     <button 
                       onClick={saveEditing} 
-                      className="px-8 py-3 bg-white text-violet-600 hover:bg-gray-50 rounded-full font-bold flex items-center gap-2 transition-all shadow-lg"
+                      className="px-8 py-3 bg-white text-violet-600 hover:bg-gray-50 rounded-full font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95"
                     >
                       <Check size={18} /> Save
                     </button>
                     <button 
                       onClick={cancelEditing} 
-                      className="px-8 py-3 bg-white/20 backdrop-blur-md text-white hover:bg-white/30 rounded-full font-bold flex items-center gap-2 transition-all"
+                      className="px-8 py-3 bg-white/20 backdrop-blur-md text-white hover:bg-white/30 rounded-full font-bold flex items-center gap-2 transition-all active:scale-95"
                     >
                       <X size={18} /> Cancel
                     </button>
@@ -129,7 +130,7 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
 
                   <button
                     onClick={handleRemovePhoto}
-                    className="absolute top-6 right-6 w-10 h-10 bg-white/10 backdrop-blur text-white hover:bg-red-500 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 border border-white/20"
+                    className="absolute top-6 right-6 w-10 h-10 bg-white/10 backdrop-blur text-white hover:bg-red-500 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 border border-white/20 active:scale-90"
                     title="Remove photo"
                   >
                     <Trash2 size={16} />
@@ -145,7 +146,7 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
                   style={{ backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
              </div>
              <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] bg-purple-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob"></div>
-             <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-pink-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob animation-delay-2000"></div>
+             <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-pink-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob" style={{ animationDelay: '2s' }}></div>
 
              {isEditing ? (
                 <div className="relative z-10 w-full max-w-3xl flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-300 bg-white/50 backdrop-blur-xl p-10 rounded-3xl border border-white shadow-xl">
@@ -165,13 +166,13 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
                   <div className="flex gap-4 mt-6">
                     <button 
                       onClick={saveEditing} 
-                      className="px-8 py-3 gradient-bg text-white hover:opacity-90 rounded-full font-bold flex items-center gap-2 transition-all shadow-lg shadow-violet-500/30"
+                      className="px-8 py-3 gradient-bg text-white hover:opacity-90 rounded-full font-bold flex items-center gap-2 transition-all shadow-lg shadow-violet-500/30 active:scale-95"
                     >
                       <Check size={18} /> Save Changes
                     </button>
                     <button 
                       onClick={cancelEditing} 
-                      className="px-8 py-3 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-full font-bold flex items-center gap-2 transition-all"
+                      className="px-8 py-3 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-full font-bold flex items-center gap-2 transition-all active:scale-95"
                     >
                       <X size={18} /> Cancel
                     </button>

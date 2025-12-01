@@ -5,8 +5,8 @@ import MediaGallery from './components/MediaGallery';
 import Lightbox from './components/Lightbox';
 import Toast from './components/Toast';
 import { MediaItem, ToastMessage, HeaderConfig, User } from './types';
-import { LayoutGrid, Sparkles, Mail, MessageCircle, Megaphone, Lightbulb, X, Info, Shield, Send, LogIn, UserPlus, LogOut, Chrome, Globe, Image as ImageIcon } from 'lucide-react';
-import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, clearAllMediaFromDB, registerUser, authenticateUser } from './db';
+import { LayoutGrid, Sparkles, Mail, MessageCircle, Megaphone, Lightbulb, X, Info, Shield, Send, LogIn, UserPlus, LogOut, Chrome, Globe, Image as ImageIcon, FileText } from 'lucide-react';
+import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser } from './db';
 
 // Ad Placeholder Component
 const AdPlaceholder: React.FC<{ className?: string; label: string; size: string }> = ({ className, label, size }) => (
@@ -33,7 +33,7 @@ const App: React.FC = () => {
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [activeModal, setActiveModal] = useState<'inspiration' | 'about' | 'privacy' | 'contact' | 'auth' | null>(null);
+  const [activeModal, setActiveModal] = useState<'inspiration' | 'about' | 'privacy' | 'contact' | 'terms' | 'auth' | null>(null);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeNav, setActiveNav] = useState('All');
@@ -75,7 +75,8 @@ const App: React.FC = () => {
 
   // --- Handlers ---
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    const id = Math.random().toString(36).substr(2, 9);
+    // Professional ID generation
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
 
@@ -151,14 +152,68 @@ const App: React.FC = () => {
   };
 
   const clearAllMedia = async () => {
-    mediaItems.forEach(item => {
-        if (item.url && item.url.startsWith('blob:')) {
-            URL.revokeObjectURL(item.url);
-        }
+    if (!currentUser?.email) return;
+
+    // Only clear items in state belonging to current user
+    setMediaItems((prev) => {
+        // Revoke blob URLs for user's items to free memory
+        prev.forEach(item => {
+            if (item.userId === currentUser.email && item.url.startsWith('blob:')) {
+                URL.revokeObjectURL(item.url);
+            }
+        });
+        return prev.filter(item => item.userId !== currentUser.email);
     });
-    setMediaItems([]);
-    await clearAllMediaFromDB();
-    showToast('All media items cleared', 'success');
+
+    await deleteUserMediaFromDB(currentUser.email);
+    showToast('Your gallery cleared successfully', 'success');
+  };
+
+  const handleSaveItem = async (item: MediaItem) => {
+    if (!currentUser) {
+        showToast('Please sign in to save items', 'error');
+        // Prompt login if not signed in
+        setActiveModal('auth');
+        return;
+    }
+
+    try {
+        // Generate a professional unique ID
+        const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+        
+        let blob = item.blob;
+        // If no blob is attached (usually the case from DB load), try to fetch it from the URL
+        if (!blob && item.url) {
+            try {
+                const response = await fetch(item.url);
+                blob = await response.blob();
+            } catch (e) {
+                console.warn("Could not fetch blob for saving, might be external URL");
+            }
+        }
+
+        const newItem: MediaItem = {
+            ...item,
+            id: newId,
+            userId: currentUser.email,
+            authorName: currentUser.name,
+            authorAvatar: currentUser.avatar,
+            likes: 0,
+            views: 0,
+            likedByUser: false,
+            blob: blob
+        };
+
+        // Artificial delay so user sees "Saving..."
+        await new Promise(r => setTimeout(r, 600));
+
+        setMediaItems(prev => [newItem, ...prev]);
+        await saveMediaItemToDB(newItem);
+        showToast('Item saved to your collection', 'success');
+    } catch (e) {
+        console.error("Failed to save item", e);
+        showToast('Failed to save item', 'error');
+    }
   };
 
   const toggleLike = (id: string) => {
@@ -234,6 +289,7 @@ const App: React.FC = () => {
     if (name === 'Inspiration') setActiveModal('inspiration');
     if (name === 'About Us') setActiveModal('about');
     if (name === 'Privacy Policy') setActiveModal('privacy');
+    if (name === 'Terms of Service') setActiveModal('terms');
     if (name === 'Contact Us') setActiveModal('contact');
   };
 
@@ -252,22 +308,36 @@ const App: React.FC = () => {
     setActiveModal('auth');
   };
 
-  const handleGoogleLogin = () => {
-    // Simulating Google Login
+  const handleGoogleLogin = async () => {
     setAuthLoading(true);
-    setTimeout(() => {
-      const mockUser: User = {
-        name: "Demo User",
-        email: "demo@example.com",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-      };
-      setCurrentUser(mockUser);
-      localStorage.setItem('creative_space_user', JSON.stringify(mockUser));
-      setAuthLoading(false);
-      setActiveModal(null);
-      setActiveNav('All');
-      showToast(`Welcome back, ${mockUser.name}!`, 'success');
-    }, 1500);
+    
+    // Create a consistent "Google" user so their data persists in the DB
+    const googleUserEmail = "google-user@creative-space.com";
+    const googleUserName = "Google User";
+    const googlePassword = "google-auth-secret-password-123"; // Internal only
+    
+    try {
+        // Try to login first
+        try {
+            const user = await authenticateUser(googleUserEmail, googlePassword);
+            setCurrentUser(user);
+            localStorage.setItem('creative_space_user', JSON.stringify(user));
+            showToast(`Welcome back, ${user.name}!`, 'success');
+        } catch (e) {
+            // If login fails, user doesn't exist, so register them
+            const newUser = await registerUser(googleUserEmail, googlePassword, googleUserName);
+            setCurrentUser(newUser);
+            localStorage.setItem('creative_space_user', JSON.stringify(newUser));
+            showToast('Account created with Google', 'success');
+        }
+        
+        setActiveModal(null);
+        setActiveNav('All');
+    } catch (e) {
+        showToast('Google authentication failed', 'error');
+    } finally {
+        setAuthLoading(false);
+    }
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -312,10 +382,11 @@ const App: React.FC = () => {
   const navItems = [
     { name: 'All', icon: Globe },
     ...(currentUser ? [{ name: 'My Gallery', icon: ImageIcon }] : []),
-    { name: 'About Us', icon: Info },
     { name: 'Inspiration', icon: Sparkles },
-    { name: 'Privacy', icon: Shield },
-    { name: 'Contact', icon: Mail }
+    { name: 'About Us', icon: Info },
+    { name: 'Privacy Policy', icon: Shield },
+    { name: 'Terms of Service', icon: FileText },
+    { name: 'Contact Us', icon: Mail }
   ];
 
   return (
@@ -411,6 +482,7 @@ const App: React.FC = () => {
               onShowToast={showToast}
               onToggleLike={toggleLike}
               onClearAll={clearAllMedia}
+              onSaveItem={handleSaveItem}
               currentUser={currentUser}
               allowUpload={activeNav === 'My Gallery'}
             />
@@ -710,6 +782,53 @@ const App: React.FC = () => {
               <h3 className="text-slate-900 font-bold text-lg mt-4">4. Contact Us</h3>
               <p>
                 If you have any questions about this Privacy Policy, please contact us via our Contact form.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms of Service Modal */}
+      {activeModal === 'terms' && (
+        <div 
+          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
+          onClick={() => setActiveModal(null)}
+        >
+          <div 
+            className="relative w-full max-w-2xl bg-white p-10 rounded-[2.5rem] shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] flex flex-col" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200 transition-colors z-10">
+              <X size={20} className="text-slate-500" />
+            </button>
+            
+            <div className="text-center flex-shrink-0">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl mb-6">
+                <FileText size={32} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 mb-2">Terms of Service</h2>
+              <p className="text-slate-400 text-sm mb-6">Effective Date: January 2025</p>
+            </div>
+
+            <div className="overflow-y-auto pr-2 text-slate-600 text-sm leading-relaxed space-y-4 text-left custom-scrollbar">
+              <p>
+                Please read these Terms of Service ("Terms") carefully before using the <strong>{headerConfig.title}</strong> website.
+              </p>
+              <h3 className="text-slate-900 font-bold text-lg mt-4">1. Acceptance of Terms</h3>
+              <p>
+                By accessing or using our Service, you agree to be bound by these Terms. If you disagree with any part of the terms, then you may not access the Service.
+              </p>
+              <h3 className="text-slate-900 font-bold text-lg mt-4">2. Content</h3>
+              <p>
+                Our Service allows you to post, link, store, share and otherwise make available certain information, text, graphics, videos, or other material ("Content"). You are responsible for the Content that you post to the Service, including its legality, reliability, and appropriateness.
+              </p>
+              <h3 className="text-slate-900 font-bold text-lg mt-4">3. Accounts</h3>
+              <p>
+                 When you create an account with us, you must provide us information that is accurate, complete, and current at all times. Failure to do so constitutes a breach of the Terms, which may result in immediate termination of your account on our Service.
+              </p>
+              <h3 className="text-slate-900 font-bold text-lg mt-4">4. Termination</h3>
+              <p>
+                We may terminate or suspend access to our Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
               </p>
             </div>
           </div>

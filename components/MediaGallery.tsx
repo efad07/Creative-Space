@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Image as ImageIcon, Film, Trash2, UploadCloud, Heart, Edit2, Link as LinkIcon, ExternalLink, X, Eye, Plus, AlertCircle, User, Globe } from 'lucide-react';
+import { Image as ImageIcon, Film, Trash2, UploadCloud, Heart, Edit2, Link as LinkIcon, ExternalLink, X, Eye, Plus, AlertCircle, User, Globe, Loader2 } from 'lucide-react';
 import { MediaItem, User as UserType } from '../types';
 
 interface MediaGalleryProps {
@@ -12,6 +12,7 @@ interface MediaGalleryProps {
   onShowToast: (message: string, type: 'success' | 'error') => void;
   onToggleLike: (id: string) => void;
   onClearAll: () => void;
+  onSaveItem: (item: MediaItem) => void;
   currentUser: UserType | null;
   allowUpload?: boolean;
 }
@@ -25,6 +26,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   onShowToast,
   onToggleLike,
   onClearAll,
+  onSaveItem,
   currentUser,
   allowUpload = false
 }) => {
@@ -37,6 +39,9 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editLink, setEditLink] = useState('');
+
+  // Saving State
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const handleImageError = (id: string) => {
     setErrorImages(prev => ({ ...prev, [id]: true }));
@@ -66,8 +71,11 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 
     validFiles.forEach((file) => {
       const objectUrl = URL.createObjectURL(file);
+      // Professional ID generation
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
+      
       newItems.push({
-        id: Math.random().toString(36).substr(2, 9),
+        id,
         type,
         url: objectUrl,
         name: file.name,
@@ -134,6 +142,21 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     }
   };
 
+  const handleSaveClick = async (e: React.MouseEvent, item: MediaItem) => {
+    e.stopPropagation();
+    if (isOwner(item)) {
+        onShowToast("You already own this item", "error");
+        return;
+    }
+    
+    setSavingId(item.id);
+    try {
+        await onSaveItem(item);
+    } finally {
+        setSavingId(null);
+    }
+  };
+
   // Helper to safely display URL hostname
   const getSafeDisplayUrl = (urlStr: string) => {
     try {
@@ -163,7 +186,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             {items.length > 0 && currentUser && (
               <button
                 onClick={handleClearAllClick}
-                className="px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-full transition-all text-sm font-bold flex items-center gap-2 mr-2"
+                className="px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-full transition-all text-sm font-bold flex items-center gap-2 mr-2 active:scale-95"
                 title="Clear All Items"
               >
                 <Trash2 size={18} />
@@ -172,14 +195,14 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             )}
             <button
               onClick={() => imageInputRef.current?.click()}
-              className="px-5 py-2.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-full transition-all text-sm font-bold flex items-center gap-2"
+              className="px-5 py-2.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-full transition-all text-sm font-bold flex items-center gap-2 active:scale-95"
             >
               <ImageIcon size={18} />
               <span>Image</span>
             </button>
             <button
               onClick={() => videoInputRef.current?.click()}
-              className="px-5 py-2.5 bg-pink-50 text-pink-700 hover:bg-pink-100 rounded-full transition-all text-sm font-bold flex items-center gap-2"
+              className="px-5 py-2.5 bg-pink-50 text-pink-700 hover:bg-pink-100 rounded-full transition-all text-sm font-bold flex items-center gap-2 active:scale-95"
             >
               <Film size={18} />
               <span>Video</span>
@@ -294,7 +317,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                             e.stopPropagation();
                             startEditing(item);
                             }}
-                            className="w-9 h-9 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-slate-900 transition-all"
+                            className="w-9 h-9 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-slate-900 transition-all active:scale-90"
                             title="Edit Details"
                         >
                             <Edit2 size={16} />
@@ -302,13 +325,18 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                        ) : (<div></div>)}
 
                        <button 
-                         className="bg-violet-600 text-white px-5 py-2 rounded-full font-bold text-xs uppercase tracking-wide hover:bg-violet-500 transition-colors shadow-lg"
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           onShowToast('Saved to collection', 'success');
-                         }}
+                         className="bg-violet-600 text-white px-5 py-2 rounded-full font-bold text-xs uppercase tracking-wide hover:bg-violet-500 transition-colors shadow-lg active:scale-95 transform disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                         disabled={savingId === item.id}
+                         onClick={(e) => handleSaveClick(e, item)}
                        >
-                         Save
+                         {savingId === item.id ? (
+                             <>
+                                <Loader2 size={12} className="animate-spin" />
+                                Saving...
+                             </>
+                         ) : (
+                             "Save"
+                         )}
                        </button>
                     </div>
 
@@ -316,7 +344,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                     <div className="flex items-center justify-between w-full pointer-events-auto text-white translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
                        <div className="flex gap-4 items-center">
                           <button 
-                           className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider transition-colors bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full
+                           className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider transition-colors bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full active:scale-95
                              ${item.likedByUser 
                                ? 'text-pink-500 bg-pink-500/10' 
                                : 'text-white hover:text-pink-400'}
@@ -343,7 +371,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="w-9 h-9 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-blue-600 transition-all"
+                              className="w-9 h-9 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-blue-600 transition-all active:scale-90"
                             >
                                <ExternalLink size={16} />
                             </a>
@@ -355,7 +383,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                 e.stopPropagation();
                                 onRemoveItem(item.id);
                                 }}
-                                className="w-9 h-9 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-red-500 hover:text-white transition-all"
+                                className="w-9 h-9 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-red-500 hover:text-white transition-all active:scale-90"
                                 title="Delete Item"
                             >
                                 <Trash2 size={16} />
