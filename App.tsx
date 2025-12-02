@@ -1,22 +1,76 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import MediaGallery from './components/MediaGallery';
 import Lightbox from './components/Lightbox';
 import Toast from './components/Toast';
-import { MediaItem, ToastMessage, HeaderConfig, User } from './types';
-import { LayoutGrid, Sparkles, Mail, MessageCircle, Megaphone, Lightbulb, X, Info, Shield, Send, LogIn, UserPlus, LogOut, Chrome, Globe, Image as ImageIcon, FileText } from 'lucide-react';
-import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser } from './db';
+import BlogPost from './components/BlogPost';
+import SearchBar from './components/SearchBar';
+import GoogleAd from './components/GoogleAd';
+import StoryViewer from './components/StoryViewer';
+import ProfileSettings from './components/ProfileSettings';
+import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData } from './types';
+import { Chrome, LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings } from 'lucide-react';
+import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB } from './db';
 
-// Ad Placeholder Component
-const AdPlaceholder: React.FC<{ className?: string; label: string; size: string }> = ({ className, label, size }) => (
-  <div className={`bg-slate-100 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 p-4 transition-all hover:bg-slate-200 hover:border-slate-400 ${className}`}>
-    <Megaphone className="mb-2 opacity-50" size={24} />
-    <span className="font-bold uppercase tracking-widest text-xs mb-1">Advertisement</span>
-    <span className="text-xs font-mono opacity-75">{label}</span>
-    <span className="text-[10px] font-mono opacity-50 mt-1">{size}</span>
-  </div>
-);
+// Sample Data for Blog
+const INITIAL_STORIES: BlogPostData[] = [
+  {
+    id: '1',
+    title: 'The Art of Minimalist Photography',
+    excerpt: 'Discover how less can be more. We explore the techniques behind stunning minimalist compositions.',
+    date: 'Mar 15, 2025',
+    author: 'Elena Fisher',
+    readTime: '5 min',
+    imageUrl: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    tags: ['Photography', 'Minimalism'],
+    content: `<p>Full content...</p>`
+  },
+  {
+    id: '2',
+    title: 'Color Theory in Digital Design',
+    excerpt: 'Understanding the psychological impact of color is crucial for any designer.',
+    date: 'Mar 12, 2025',
+    author: 'Marcus Chen',
+    readTime: '8 min',
+    imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    tags: ['Design', 'UX'],
+    content: `<p>Full content...</p>`
+  },
+  {
+    id: '3',
+    title: 'Capturing Urban Solitude',
+    excerpt: 'A photo essay on finding silence in the chaos of the city.',
+    date: 'Mar 10, 2025',
+    author: 'Sarah Jenkins',
+    readTime: '6 min',
+    imageUrl: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    tags: ['Urban', 'Travel'],
+    content: `<p>Full content...</p>`
+  },
+  {
+    id: '4',
+    title: 'Modern Architecture',
+    excerpt: 'The lines between nature and structure are blurring in modern architectural trends.',
+    date: 'Mar 08, 2025',
+    author: 'David Wright',
+    readTime: '4 min',
+    imageUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    tags: ['Architecture', 'Design'],
+    content: `<p>Full content...</p>`
+  },
+  {
+    id: '5',
+    title: 'Neon Nights',
+    excerpt: 'Cyberpunk aesthetics in real world photography.',
+    date: 'Mar 05, 2025',
+    author: 'Alice V.',
+    readTime: '3 min',
+    imageUrl: 'https://images.unsplash.com/photo-1555685812-4b943f3e9942?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    tags: ['Photography', 'Neon'],
+    content: `<p>Full content...</p>`
+  }
+];
 
 const App: React.FC = () => {
   // --- State ---
@@ -33,10 +87,24 @@ const App: React.FC = () => {
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [activeModal, setActiveModal] = useState<'inspiration' | 'about' | 'privacy' | 'contact' | 'terms' | 'auth' | null>(null);
+  const [activeModal, setActiveModal] = useState<'auth' | 'profile' | null>(null);
+  
+  // Story States
+  const [stories, setStories] = useState<BlogPostData[]>(INITIAL_STORIES);
+  const [activeStory, setActiveStory] = useState<BlogPostData | null>(null); // For Reading
+  const [viewingStoryIndex, setViewingStoryIndex] = useState<number | null>(null); // For Story Player
+  const [watchedStories, setWatchedStories] = useState<string[]>([]);
+  const storyInputRef = useRef<HTMLInputElement>(null);
+
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeNav, setActiveNav] = useState('All');
+  
+  // New Filter & View States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
   const [isLoading, setIsLoading] = useState(true);
 
   // Auth Form State
@@ -49,23 +117,18 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load User from LocalStorage
         const savedUser = localStorage.getItem('creative_space_user');
-        if (savedUser) {
-          setCurrentUser(JSON.parse(savedUser));
-        }
-
-        // Load Config
+        if (savedUser) setCurrentUser(JSON.parse(savedUser));
         const savedConfig = await getConfigFromDB();
-        if (savedConfig) {
-          setHeaderConfig(savedConfig);
-        }
-
-        // Load Media
+        if (savedConfig) setHeaderConfig(savedConfig);
         const savedMedia = await getMediaItemsFromDB();
         setMediaItems(savedMedia);
+        
+        // Load watched stories
+        const savedWatched = localStorage.getItem('creative_space_watched_stories');
+        if(savedWatched) setWatchedStories(JSON.parse(savedWatched));
       } catch (error) {
-        console.error("Failed to load data from DB", error);
+        console.error("Failed to load data", error);
       } finally {
         setIsLoading(false);
       }
@@ -73,16 +136,25 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  // --- Handlers ---
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    // Professional ID generation
-    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
+    const id = Math.random().toString(36).substr(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  // --- Helper to get Consistent Author Info ---
+  const getCurrentAuthorInfo = () => {
+    if (!currentUser) return { name: 'Guest User', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest', email: 'guest' };
+    
+    const name = currentUser.name || 'Anonymous';
+    // Use uploaded avatar OR generate a deterministic one based on name so user always has a graphical avatar
+    const avatar = currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s/g, '')}`;
+    
+    return { name, avatar, email: currentUser.email };
+  };
 
   const updateHeaderPhoto = async (url: string | null) => {
     const newConfig = { ...headerConfig, photoUrl: url };
@@ -97,348 +169,297 @@ const App: React.FC = () => {
   };
 
   const addMediaItems = async (newItems: MediaItem[]) => {
-    // Attach current user info to items if logged in
+    const authorInfo = getCurrentAuthorInfo();
+    
     const itemsWithUser = newItems.map(item => ({
       ...item,
-      userId: currentUser?.email,
-      authorName: currentUser?.name || 'Guest User',
-      authorAvatar: currentUser?.avatar
+      userId: authorInfo.email,
+      authorName: authorInfo.name,
+      authorAvatar: authorInfo.avatar
     }));
-
-    setMediaItems((prev) => [...prev, ...itemsWithUser]);
     
+    setMediaItems((prev) => [...prev, ...itemsWithUser]);
     for (const item of itemsWithUser) {
-        if (item.url) {
+        if (item.url && item.url.startsWith('blob:')) {
             try {
-                // Fetch only if it's a blob url we just created
-                if (item.url.startsWith('blob:')) {
-                    const response = await fetch(item.url);
-                    const blob = await response.blob();
-                    await saveMediaItemToDB({ ...item, blob });
-                }
-            } catch (e) {
-                console.error("Failed to save media item blob", e);
-            }
+                const response = await fetch(item.url);
+                const blob = await response.blob();
+                await saveMediaItemToDB({ ...item, blob });
+            } catch (e) { console.error(e); }
         }
     }
   };
 
   const updateMediaItem = async (id: string, updates: Partial<MediaItem>) => {
-    setMediaItems((prev) => 
-      prev.map((item) => {
-          if (item.id === id) {
-              const updatedItem = { ...item, ...updates };
-              saveMediaItemToDB(updatedItem); 
-              return updatedItem;
-          }
-          return item;
-      })
-    );
-    if (Object.keys(updates).some(k => k === 'title' || k === 'link')) {
-        showToast('Media details updated', 'success');
-    }
+    setMediaItems(prev => prev.map(item => {
+       if (item.id === id) {
+           const updated = { ...item, ...updates };
+           saveMediaItemToDB(updated);
+           return updated;
+       }
+       return item;
+    }));
   };
 
   const removeMediaItem = async (id: string) => {
-    setMediaItems((prev) => {
-      const itemToRemove = prev.find(item => item.id === id);
-      if (itemToRemove && itemToRemove.url.startsWith('blob:')) {
-        URL.revokeObjectURL(itemToRemove.url);
-      }
-      return prev.filter((item) => item.id !== id);
-    });
+    setMediaItems(prev => prev.filter(item => item.id !== id));
     await deleteMediaItemFromDB(id);
-    showToast('Media item deleted', 'success');
+    showToast('Item deleted', 'success');
   };
 
   const clearAllMedia = async () => {
     if (!currentUser?.email) return;
-
-    // Only clear items in state belonging to current user
-    setMediaItems((prev) => {
-        // Revoke blob URLs for user's items to free memory
-        prev.forEach(item => {
-            if (item.userId === currentUser.email && item.url.startsWith('blob:')) {
-                URL.revokeObjectURL(item.url);
-            }
-        });
-        return prev.filter(item => item.userId !== currentUser.email);
-    });
-
+    setMediaItems(prev => prev.filter(item => item.userId !== currentUser.email));
     await deleteUserMediaFromDB(currentUser.email);
-    showToast('Your gallery cleared successfully', 'success');
+    showToast('Gallery cleared', 'success');
   };
 
   const handleSaveItem = async (item: MediaItem) => {
     if (!currentUser) {
         showToast('Please sign in to save items', 'error');
-        // Prompt login if not signed in
+        setActiveModal('auth');
+        return;
+    }
+    const newId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    let blob = item.blob;
+    if (!blob && item.url) {
+        try { 
+          const r = await fetch(item.url); 
+          if(r.ok) blob = await r.blob(); 
+        } catch(e){}
+    }
+    
+    const authorInfo = getCurrentAuthorInfo();
+    const newItem = { 
+        ...item, 
+        id: newId, 
+        userId: authorInfo.email, 
+        authorName: authorInfo.name, 
+        authorAvatar: authorInfo.avatar, 
+        likes: 0, 
+        views: 0, 
+        likedByUser: false, 
+        blob 
+    };
+
+    await new Promise(r => setTimeout(r, 600));
+    setMediaItems(prev => [newItem, ...prev]);
+    await saveMediaItemToDB(newItem);
+    showToast('Item saved to your collection', 'success');
+  };
+
+  const toggleLike = (id: string) => {
+    setMediaItems(prev => prev.map(item => {
+        if (item.id === id) {
+            const isLiked = !item.likedByUser;
+            const updated = { ...item, likedByUser: isLiked, likes: isLiked ? item.likes + 1 : item.likes - 1 };
+            saveMediaItemToDB(updated);
+            return updated;
+        }
+        return item;
+    }));
+  };
+
+  const incrementView = (id: string) => {
+    setMediaItems(prev => prev.map(item => {
+        if (item.id === id) {
+            const updated = { ...item, views: (item.views || 0) + 1 };
+            saveMediaItemToDB(updated);
+            return updated;
+        }
+        return item;
+    }));
+  };
+
+  const handleStoryOpen = (index: number) => {
+    setViewingStoryIndex(index);
+    const storyId = stories[index].id;
+    if (!watchedStories.includes(storyId)) {
+        const newWatched = [...watchedStories, storyId];
+        setWatchedStories(newWatched);
+        localStorage.setItem('creative_space_watched_stories', JSON.stringify(newWatched));
+    }
+  };
+
+  const handleStoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!currentUser) {
+        showToast('Please sign in to post stories', 'error');
         setActiveModal('auth');
         return;
     }
 
-    try {
-        // Generate a professional unique ID
-        const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
-        
-        let blob = item.blob;
-        // If no blob is attached (usually the case from DB load), try to fetch it from the URL
-        if (!blob && item.url) {
-            try {
-                const response = await fetch(item.url);
-                blob = await response.blob();
-            } catch (e) {
-                console.warn("Could not fetch blob for saving, might be external URL");
-            }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        if (typeof event.target?.result === 'string') {
+            const authorInfo = getCurrentAuthorInfo();
+            const newStory: BlogPostData = {
+                id: Math.random().toString(36).substr(2, 9),
+                title: 'New Story',
+                excerpt: 'Just posted a new story!',
+                date: 'Just now',
+                author: authorInfo.name,
+                authorAvatar: authorInfo.avatar,
+                readTime: '1 min',
+                imageUrl: event.target.result,
+                tags: ['Story', 'New'],
+                content: '<p>New story update...</p>'
+            };
+            setStories(prev => [newStory, ...prev]);
+            showToast('Your story has been added!', 'success');
         }
-
-        const newItem: MediaItem = {
-            ...item,
-            id: newId,
-            userId: currentUser.email,
-            authorName: currentUser.name,
-            authorAvatar: currentUser.avatar,
-            likes: 0,
-            views: 0,
-            likedByUser: false,
-            blob: blob
-        };
-
-        // Artificial delay so user sees "Saving..."
-        await new Promise(r => setTimeout(r, 600));
-
-        setMediaItems(prev => [newItem, ...prev]);
-        await saveMediaItemToDB(newItem);
-        showToast('Item saved to your collection', 'success');
-    } catch (e) {
-        console.error("Failed to save item", e);
-        showToast('Failed to save item', 'error');
-    }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
-  const toggleLike = (id: string) => {
-    setMediaItems((prev) => 
-      prev.map((item) => {
-        if (item.id === id) {
-          const isLiked = !item.likedByUser;
-          const updatedItem = {
-            ...item,
-            likedByUser: isLiked,
-            likes: isLiked ? item.likes + 1 : item.likes - 1
-          };
-          saveMediaItemToDB(updatedItem); 
-          return updatedItem;
-        }
-        return item;
-      })
-    );
-  };
-
-  const incrementView = (id: string) => {
-    setMediaItems((prev) => 
-      prev.map((item) => {
-        if (item.id === id) {
-            const updatedItem = { ...item, views: item.views + 1 };
-            saveMediaItemToDB(updatedItem);
-            return updatedItem;
-        }
-        return item;
-      })
-    );
-  };
-
-  // Logic to filter items based on view
   const getDisplayedItems = () => {
-    if (activeNav === 'My Gallery' && currentUser) {
-      return mediaItems.filter(item => item.userId === currentUser.email);
-    }
-    return mediaItems;
+    let items = mediaItems;
+    if (activeNav === 'My Gallery' && currentUser) items = items.filter(item => item.userId === currentUser.email);
+    if (activeCategory !== 'All') items = items.filter(item => item.category === activeCategory);
+    if (searchQuery) items = items.filter(item => (item.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    return items;
   };
 
   const displayedItems = getDisplayedItems();
+  const displayedPosts = stories.filter(post => !searchQuery || post.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const openLightbox = (index: number) => {
-    if (displayedItems[index]) {
-      incrementView(displayedItems[index].id);
-    }
-    setLightboxState({ isOpen: true, index });
-  };
-
-  const closeLightbox = () => {
-    setLightboxState((prev) => ({ ...prev, isOpen: false }));
-  };
-
-  const nextMedia = () => {
-    const nextIndex = Math.min(lightboxState.index + 1, displayedItems.length - 1);
-    if (nextIndex !== lightboxState.index) {
-       incrementView(displayedItems[nextIndex].id);
-       setLightboxState((prev) => ({ ...prev, index: nextIndex }));
-    }
-  };
-
-  const prevMedia = () => {
-    const prevIndex = Math.max(lightboxState.index - 1, 0);
-    if (prevIndex !== lightboxState.index) {
-      incrementView(displayedItems[prevIndex].id);
-      setLightboxState((prev) => ({ ...prev, index: prevIndex }));
-    }
-  };
-
-  const handleNavClick = (name: string) => {
-    setActiveNav(name);
-    if (name === 'Inspiration') setActiveModal('inspiration');
-    if (name === 'About Us') setActiveModal('about');
-    if (name === 'Privacy Policy') setActiveModal('privacy');
-    if (name === 'Terms of Service') setActiveModal('terms');
-    if (name === 'Contact Us') setActiveModal('contact');
-  };
-
-  const handleContactSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setActiveModal(null);
-    showToast('Message sent successfully!', 'success');
-  };
-
-  // --- Auth Handlers ---
+  // Auth & Nav Handlers
   const handleAuthClick = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
-    setEmail('');
-    setPassword('');
-    setName('');
     setActiveModal('auth');
-  };
-
-  const handleGoogleLogin = async () => {
-    setAuthLoading(true);
-    
-    // Create a consistent "Google" user so their data persists in the DB
-    const googleUserEmail = "google-user@creative-space.com";
-    const googleUserName = "Google User";
-    const googlePassword = "google-auth-secret-password-123"; // Internal only
-    
-    try {
-        // Try to login first
-        try {
-            const user = await authenticateUser(googleUserEmail, googlePassword);
-            setCurrentUser(user);
-            localStorage.setItem('creative_space_user', JSON.stringify(user));
-            showToast(`Welcome back, ${user.name}!`, 'success');
-        } catch (e) {
-            // If login fails, user doesn't exist, so register them
-            const newUser = await registerUser(googleUserEmail, googlePassword, googleUserName);
-            setCurrentUser(newUser);
-            localStorage.setItem('creative_space_user', JSON.stringify(newUser));
-            showToast('Account created with Google', 'success');
-        }
-        
-        setActiveModal(null);
-        setActiveNav('All');
-    } catch (e) {
-        showToast('Google authentication failed', 'error');
-    } finally {
-        setAuthLoading(false);
-    }
-  };
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    
-    try {
-        if (authMode === 'signup') {
-            const newUser = await registerUser(email, password, name);
-            setCurrentUser(newUser);
-            localStorage.setItem('creative_space_user', JSON.stringify(newUser));
-            showToast('Account created successfully!', 'success');
-        } else {
-            const user = await authenticateUser(email, password);
-            setCurrentUser(user);
-            localStorage.setItem('creative_space_user', JSON.stringify(user));
-            showToast('Successfully logged in!', 'success');
-        }
-        setActiveModal(null);
-        setActiveNav('All');
-    } catch (err: any) {
-        showToast(err.message || 'Authentication failed', 'error');
-    } finally {
-        setAuthLoading(false);
-    }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('creative_space_user');
     setActiveNav('All');
-    showToast('You have been logged out.', 'success');
+    showToast('Logged out', 'success');
   };
 
-  if (isLoading) {
-      return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-violet-600"></div>
-      </div>;
-  }
+  const handleGoogleLogin = async () => {
+      const user = { name: "Google User", email: "google@user.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Google" };
+      try {
+        await saveUserToDB(user);
+      } catch (e) {
+        console.error("Failed to sync Google user to DB", e);
+      }
+      
+      setCurrentUser(user);
+      localStorage.setItem('creative_space_user', JSON.stringify(user));
+      setActiveModal(null);
+      showToast('Signed in with Google', 'success');
+  };
 
-  // Navigation Items Configuration
-  const navItems = [
-    { name: 'All', icon: Globe },
-    ...(currentUser ? [{ name: 'My Gallery', icon: ImageIcon }] : []),
-    { name: 'Inspiration', icon: Sparkles },
-    { name: 'About Us', icon: Info },
-    { name: 'Privacy Policy', icon: Shield },
-    { name: 'Terms of Service', icon: FileText },
-    { name: 'Contact Us', icon: Mail }
-  ];
+  const handleEmailAuth = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setAuthLoading(true);
+      try {
+          const user = authMode === 'signup' 
+            ? await registerUser(email, password, name) 
+            : await authenticateUser(email, password);
+          setCurrentUser(user);
+          localStorage.setItem('creative_space_user', JSON.stringify(user));
+          setActiveModal(null);
+          showToast('Success!', 'success');
+      } catch(e: any) { showToast(e.message, 'error'); } 
+      finally { setAuthLoading(false); }
+  };
+  
+  const handleUpdateProfile = async (updates: Partial<User>) => {
+      if (!currentUser) return;
+      try {
+          let updatedUser;
+          try {
+             updatedUser = await updateUser(currentUser.email, updates);
+          } catch (dbError: any) {
+             // If user missing in DB (cleared cache or Google login issue), try to recover
+             if (dbError.message === "User not found") {
+                 const recoveredUser = { ...currentUser, ...updates };
+                 await saveUserToDB(recoveredUser);
+                 updatedUser = recoveredUser;
+             } else {
+                 throw dbError;
+             }
+          }
+
+          try {
+             localStorage.setItem('creative_space_user', JSON.stringify(updatedUser));
+          } catch(storageError) {
+             throw new Error("Storage full. Image likely too large.");
+          }
+          setCurrentUser(updatedUser);
+
+          // --- SYNC UPDATE: Update all previous posts by this user ---
+          if (updates.avatar || updates.name) {
+             const newName = updatedUser.name;
+             const newAvatar = updatedUser.avatar;
+
+             // 1. Update Gallery Items
+             setMediaItems(prev => prev.map(item => {
+                 if (item.userId === currentUser.email) {
+                     const updatedItem = { ...item, authorName: newName, authorAvatar: newAvatar };
+                     saveMediaItemToDB(updatedItem);
+                     return updatedItem;
+                 }
+                 return item;
+             }));
+
+             // 2. Update Stories
+             setStories(prev => prev.map(story => {
+                if (story.author === currentUser.name) {
+                    return { ...story, author: newName, authorAvatar: newAvatar };
+                }
+                return story;
+             }));
+          }
+
+          showToast('Profile updated successfully', 'success');
+      } catch (e: any) {
+          console.error(e);
+          showToast(e.message || 'Failed to update profile', 'error');
+          throw e; 
+      }
+  };
+
+  if (isLoading) return <div className="h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-violet-200 selection:text-violet-900">
+    <div className="min-h-screen text-slate-900 font-sans selection:bg-purple-200 selection:text-purple-900 relative overflow-x-hidden">
       <Toast toasts={toasts} removeToast={removeToast} />
       
-      {/* Floating Glass Navigation */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/50 rounded-full px-2 py-2 flex items-center gap-1 transition-all duration-300 max-w-[95vw] overflow-x-auto no-scrollbar">
-        {navItems.map((item) => (
-          <button
-            key={item.name}
-            onClick={() => handleNavClick(item.name)}
-            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
-              activeNav === item.name
-                ? 'bg-slate-900 text-white shadow-lg' 
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <item.icon size={16} />
-            <span className="hidden md:inline">{item.name}</span>
-          </button>
-        ))}
+      {/* Floating Navigation */}
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-2 py-2 flex items-center gap-1 transition-all duration-300 max-w-[95%]">
+        <button onClick={() => setActiveNav('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${activeNav === 'All' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
+        {currentUser && <button onClick={() => setActiveNav('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${activeNav === 'My Gallery' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
         
-        <div className="w-px h-6 bg-slate-200 mx-1"></div>
+        <div className="w-px h-6 bg-slate-200/50 mx-2 hidden sm:block"></div>
 
         {currentUser ? (
-           <div className="flex items-center gap-2 px-2">
-             <div className="w-8 h-8 rounded-full overflow-hidden bg-violet-100 border border-violet-200">
-               <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
-             </div>
-             <button 
-               onClick={handleLogout}
-               className="p-2 rounded-full text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
-               title="Sign Out"
+           <div className="flex items-center gap-2 pr-1 pl-1">
+             <div 
+                className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all bg-slate-200"
+                onClick={() => setActiveModal('profile')}
              >
-               <LogOut size={18} />
+               {currentUser.avatar ? (
+                 <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center bg-purple-500 text-white font-bold text-xs">
+                   {currentUser.name.charAt(0)}
+                 </div>
+               )}
+             </div>
+             <button onClick={() => setActiveModal('profile')} className="p-2 text-slate-400 hover:text-slate-700 transition-colors" title="Settings">
+                 <Settings size={18} />
              </button>
+             <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Logout"><LogOut size={18} /></button>
            </div>
         ) : (
-          <div className="flex items-center gap-1">
-             <button
-               onClick={() => handleAuthClick('signin')}
-               className="px-4 py-2.5 rounded-full text-sm font-semibold text-slate-600 hover:text-violet-600 hover:bg-violet-50 transition-all whitespace-nowrap"
-             >
-               Sign In
-             </button>
-             <button
-               onClick={() => handleAuthClick('signup')}
-               className="px-4 py-2.5 rounded-full text-sm font-bold bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-200 transition-all whitespace-nowrap flex items-center gap-1"
-             >
-               <span>Sign Up</span>
-             </button>
+          <div className="flex items-center gap-1 pl-1 pr-1">
+             <button onClick={() => handleAuthClick('signin')} className="px-5 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-purple-600 transition-all hover:bg-white/50">Sign In</button>
+             <button onClick={() => handleAuthClick('signup')} className="px-6 py-2.5 rounded-full text-sm font-bold bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 transition-all shadow-lg shadow-purple-500/20">Sign Up</button>
           </div>
         )}
       </nav>
@@ -450,434 +471,232 @@ const App: React.FC = () => {
         onShowToast={showToast}
       />
 
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
         
-        {/* Ad Space: Top Leaderboard */}
-        <div className="w-full flex justify-center mb-16">
-          <AdPlaceholder className="w-full max-w-[728px] h-[90px] hidden md:flex" label="Leaderboard Ad" size="728x90" />
-          <AdPlaceholder className="w-full h-[100px] md:hidden" label="Mobile Banner Ad" size="Responsive" />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Main Content Area */}
-          <div className="lg:col-span-9">
-            {/* View Title */}
-            <div className="mb-6">
-                <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
-                    {activeNav === 'My Gallery' ? 'My Collections' : 'Community Feed'}
-                </h2>
-                <p className="text-slate-500 mt-1">
-                    {activeNav === 'My Gallery' 
-                        ? 'Manage your personal uploads and creations.' 
-                        : 'Discover inspiring work from creators worldwide.'}
-                </p>
+        {/* Story Tray */}
+        <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex gap-4 min-w-max">
+            {/* My Story (Add) */}
+            <div 
+                className="flex flex-col items-center gap-2 cursor-pointer group" 
+                onClick={() => storyInputRef.current?.click()}
+            >
+               <input 
+                 type="file" 
+                 ref={storyInputRef} 
+                 onChange={handleStoryUpload} 
+                 className="hidden" 
+                 accept="image/*" 
+               />
+               <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform">
+                  <div className="absolute inset-0 rounded-full overflow-hidden opacity-60">
+                    <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(currentUser?.name || 'guest').replace(/\s/g, '')}`} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm">
+                    <Plus size={14} strokeWidth={3}/>
+                  </div>
+               </div>
+               <span className="text-xs font-semibold text-slate-500">Your Story</span>
             </div>
 
-            <MediaGallery 
-              items={displayedItems}
-              onAddItems={addMediaItems}
-              onUpdateItem={updateMediaItem}
-              onRemoveItem={removeMediaItem}
-              onOpenLightbox={openLightbox}
-              onShowToast={showToast}
-              onToggleLike={toggleLike}
-              onClearAll={clearAllMedia}
-              onSaveItem={handleSaveItem}
-              currentUser={currentUser}
-              allowUpload={activeNav === 'My Gallery'}
-            />
-          </div>
-
-          {/* Ad Column */}
-          <div className="lg:col-span-3 space-y-8">
-             {/* Inspiration Block */}
-             <div 
-               className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-8 rounded-3xl text-white shadow-xl shadow-violet-500/20 relative overflow-hidden group cursor-pointer transform hover:-translate-y-1 transition-all duration-300"
-               onClick={() => setActiveModal('inspiration')}
-             >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all duration-500"></div>
-                <div className="relative z-10">
-                  <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
-                    <Lightbulb className="text-yellow-300 fill-current" /> Daily Inspiration
-                  </h3>
-                  <p className="text-white/90 font-medium leading-relaxed mb-6 text-sm">
-                    "Creativity is intelligence having fun." <br/><br/>
-                    Let these visuals spark your imagination and fuel your next big idea.
-                  </p>
-                  <button className="bg-white/20 backdrop-blur-md border border-white/30 text-white px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider hover:bg-white hover:text-violet-600 transition-all">
-                    View Full
-                  </button>
+            {/* Other Stories */}
+            {stories.map((story, index) => {
+               const isWatched = watchedStories.includes(story.id);
+               return (
+                <div key={story.id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => handleStoryOpen(index)}>
+                   <div className={`w-20 h-20 rounded-full p-[3px] group-hover:scale-105 transition-transform duration-300 ${isWatched ? 'bg-slate-200' : 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-fuchsia-600'}`}>
+                      <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white relative">
+                        <img src={story.imageUrl} className="w-full h-full object-cover" />
+                      </div>
+                   </div>
+                   <span className="text-xs font-semibold text-slate-600 max-w-[80px] truncate">{story.author.split(' ')[0]}</span>
                 </div>
-             </div>
-
-             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Sponsored</h3>
-                <AdPlaceholder className="w-full h-[250px]" label="Medium Rectangle" size="300x250" />
-             </div>
-
-             <div className="sticky top-28 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Advertisement</h3>
-                <AdPlaceholder className="w-full h-[600px]" label="Large Skyscraper" size="300x600" />
-             </div>
+               );
+            })}
           </div>
+        </div>
+
+        {/* Leaderboard Ad */}
+        <div className="w-full flex justify-center mb-16">
+          <GoogleAd 
+            className="w-full max-w-[970px] h-[90px] md:h-[250px] shadow-sm" 
+            slot="1234567890" 
+            format="horizontal" 
+          />
+        </div>
+
+        {/* Main Content Area */}
+        <div className="w-full">
+            <div className="mb-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+                <div>
+                    <h2 className="text-5xl font-black text-slate-900 mb-3 tracking-tight">
+                    {activeNav === 'My Gallery' ? 'My Collections' : 'Community Feed'}
+                    </h2>
+                    <p className="text-slate-500 font-medium text-lg">
+                    {activeNav === 'My Gallery' ? 'Manage your personal uploads.' : 'Discover inspiring work from creators worldwide.'}
+                    </p>
+                </div>
+                {/* View Toggle */}
+                {activeNav !== 'Stories' && (
+                    <div className="flex bg-white/50 backdrop-blur-md rounded-2xl p-1 border border-white shadow-sm">
+                        <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><Grid size={20}/></button>
+                        <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><List size={20}/></button>
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-6">
+                <SearchBar value={searchQuery} onChange={setSearchQuery} />
+                
+                {/* Categories Filter Bar */}
+                {activeNav !== 'Stories' && (
+                    <div className="flex overflow-x-auto pb-4 gap-3 no-scrollbar items-center">
+                        {['All', 'Photography', 'Art', 'Design', 'Tech', 'Lifestyle'].map(cat => (
+                            <button 
+                                key={cat}
+                                onClick={() => setActiveCategory(cat)}
+                                className={`px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${
+                                    activeCategory === cat 
+                                    ? 'bg-slate-900 text-white border-slate-900' 
+                                    : 'bg-white/40 border-slate-200 text-slate-600 hover:bg-white hover:border-purple-300 hover:text-purple-600'
+                                }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            </div>
+
+            {/* In-feed Ad */}
+            <GoogleAd className="w-full h-[120px] mb-12 shadow-sm" slot="0987654321" format="horizontal" />
+
+            <MediaGallery 
+                items={displayedItems}
+                onAddItems={addMediaItems}
+                onUpdateItem={updateMediaItem}
+                onRemoveItem={removeMediaItem}
+                onOpenLightbox={(i) => {
+                    setLightboxState({ isOpen: true, index: i });
+                    const item = displayedItems[i];
+                    if (item) incrementView(item.id);
+                }}
+                onShowToast={showToast}
+                onToggleLike={toggleLike}
+                onClearAll={clearAllMedia}
+                onSaveItem={handleSaveItem}
+                currentUser={currentUser}
+                allowUpload={activeNav === 'My Gallery'}
+                viewMode={viewMode}
+            />
         </div>
       </main>
 
-      <footer className="bg-white border-t border-slate-100 py-16 mt-12 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 gradient-bg opacity-30"></div>
+      {/* Footer Ad */}
+      <div className="max-w-[1200px] mx-auto px-4 mb-8">
+        <GoogleAd className="w-full h-[200px]" slot="5555555555" format="auto" />
+      </div>
+
+      <footer className="bg-white/50 backdrop-blur-lg border-t border-slate-200 py-20">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-extrabold mb-6 gradient-text inline-block">{headerConfig.title}</h2>
-          <p className="text-slate-500 mb-8 max-w-md mx-auto">
-            Crafting digital experiences with passion and precision. Join our community of creators.
-          </p>
-          <div className="flex justify-center gap-6 mb-8">
-             {[1,2,3].map(i => (
-               <div key={i} className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-violet-600 hover:border-violet-200 hover:bg-violet-50 transition-all cursor-pointer">
-                 <MessageCircle size={18} />
-               </div>
-             ))}
-          </div>
-          <p className="text-slate-400 text-sm font-medium">© 2025 Creative Studio. All rights reserved.</p>
+             <h2 className="text-4xl font-black mb-6 gradient-text">{headerConfig.title}</h2>
+             <div className="flex justify-center gap-6 mb-8">
+                {['About', 'Privacy', 'Contact', 'Terms'].map(item => (
+                    <a key={item} href="#" className="text-slate-500 font-bold hover:text-purple-600 transition-colors">{item}</a>
+                ))}
+             </div>
+             <p className="text-slate-400 text-sm font-medium">© 2025 Creative Space Studio. All rights reserved.</p>
         </div>
       </footer>
 
-      {/* Lightbox */}
       <Lightbox 
         items={displayedItems}
         currentIndex={lightboxState.index}
         isOpen={lightboxState.isOpen}
-        onClose={closeLightbox}
-        onNext={nextMedia}
-        onPrev={prevMedia}
+        onClose={() => setLightboxState(p => ({...p, isOpen: false}))}
+        onNext={() => {
+            const nextIndex = Math.min(lightboxState.index + 1, displayedItems.length - 1);
+            setLightboxState(p => ({...p, index: nextIndex}));
+            const item = displayedItems[nextIndex];
+            if (item) incrementView(item.id);
+        }}
+        onPrev={() => {
+            const prevIndex = Math.max(lightboxState.index - 1, 0);
+            setLightboxState(p => ({...p, index: prevIndex}));
+            const item = displayedItems[prevIndex];
+            if (item) incrementView(item.id);
+        }}
         onToggleLike={toggleLike}
       />
+      
+      {/* Immersive Story Viewer */}
+      {viewingStoryIndex !== null && (
+        <StoryViewer 
+            stories={stories} 
+            initialIndex={viewingStoryIndex} 
+            onClose={() => setViewingStoryIndex(null)}
+            onReadMore={(story) => {
+                setViewingStoryIndex(null);
+                setActiveStory(story);
+            }}
+        />
+      )}
+
+      {/* Story Reader Modal (Long Form) */}
+      {activeStory && (
+        <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-in slide-in-from-bottom-10">
+           <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex justify-between items-center z-10">
+              <button onClick={() => setActiveStory(null)} className="flex items-center gap-2 font-bold text-slate-600 hover:text-purple-600 bg-slate-50 px-4 py-2 rounded-full hover:bg-purple-50 transition-colors"><ArrowLeft size={20}/> Back</button>
+              <div className="flex gap-2"><button className="p-3 rounded-full bg-slate-50 hover:bg-pink-50 hover:text-pink-500 transition-colors"><Heart size={20}/></button></div>
+           </div>
+           <article className="max-w-3xl mx-auto px-6 py-16">
+              <div className="flex gap-3 mb-6">
+                {activeStory.tags?.map(tag => (
+                    <span key={tag} className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase">{tag}</span>
+                ))}
+              </div>
+              <h1 className="text-5xl md:text-6xl font-black text-slate-900 mb-8 leading-tight">{activeStory.title}</h1>
+              {activeStory.imageUrl && <img src={activeStory.imageUrl} className="w-full rounded-[2.5rem] shadow-2xl mb-12" />}
+              <div className="prose prose-xl prose-slate mx-auto">
+                <p className="text-2xl text-slate-600 font-medium leading-relaxed mb-8">{activeStory.excerpt}</p>
+                <div dangerouslySetInnerHTML={{ __html: activeStory.content || '' }} />
+              </div>
+           </article>
+        </div>
+      )}
 
       {/* Auth Modal */}
       {activeModal === 'auth' && (
-        <div 
-          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveModal(null)}
-        >
-          <div 
-            className="relative w-full max-w-md bg-white p-8 rounded-[2rem] shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden" 
-            onClick={(e) => e.stopPropagation()}
-          >
-             <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
-              <X size={18} className="text-slate-500" />
-            </button>
-
-            <div className="text-center mb-8">
-               <h2 className="text-3xl font-black text-slate-900 mb-2">
-                 {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
-               </h2>
-               <p className="text-slate-500">
-                 {authMode === 'signin' ? 'Enter your details to access your account' : 'Join our community of creators today'}
-               </p>
-            </div>
-
-            {/* Google Login Button */}
-            <button 
-              onClick={handleGoogleLogin}
-              disabled={authLoading}
-              className="w-full py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-all flex items-center justify-center gap-3 mb-6 shadow-sm hover:shadow-md active:scale-95 group disabled:opacity-50"
-            >
-               <Chrome size={20} className="text-slate-900 group-hover:text-blue-600 transition-colors" />
-               <span>Continue with Google</span>
-            </button>
-
-            <div className="relative mb-6">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-              <div className="relative flex justify-center text-sm"><span className="px-4 bg-white text-slate-400 font-medium">Or continue with email</span></div>
-            </div>
-
-            <form onSubmit={handleEmailAuth} className="space-y-4">
-               {authMode === 'signup' && (
-                  <div className="animate-in slide-in-from-top-4 fade-in duration-300">
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Full Name</label>
-                    <input 
-                        type="text" 
-                        placeholder="John Doe" 
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none font-medium transition-all" 
-                        required={authMode === 'signup'} 
-                    />
-                  </div>
-               )}
-               <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Email</label>
-                  <input 
-                    type="email" 
-                    placeholder="name@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none font-medium transition-all" 
-                    required 
-                  />
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setActiveModal(null)}>
+           <div className="bg-white p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+               <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-6 mx-auto"><Chrome size={32}/></div>
+               <h2 className="text-3xl font-black mb-2 text-center text-slate-900">{authMode === 'signin' ? 'Welcome Back' : 'Create Account'}</h2>
+               <p className="text-center text-slate-500 mb-8">Enter your details to access your creative space.</p>
+               <form onSubmit={handleEmailAuth} className="space-y-4">
+                   {authMode === 'signup' && <input placeholder="Full Name" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition-colors font-medium" value={name} onChange={e => setName(e.target.value)} />}
+                   <input placeholder="Email Address" type="email" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition-colors font-medium" value={email} onChange={e => setEmail(e.target.value)} />
+                   <input placeholder="Password" type="password" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition-colors font-medium" value={password} onChange={e => setPassword(e.target.value)} />
+                   <button className="w-full py-4 bg-slate-900 hover:bg-purple-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-purple-200">{authLoading ? 'Processing...' : (authMode === 'signin' ? 'Sign In' : 'Sign Up')}</button>
+               </form>
+               <div className="mt-6 flex items-center justify-center gap-4">
+                   <div className="h-px bg-slate-200 flex-1"></div>
+                   <span className="text-xs font-bold text-slate-400 uppercase">Or continue with</span>
+                   <div className="h-px bg-slate-200 flex-1"></div>
                </div>
-               <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Password</label>
-                  <input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 outline-none font-medium transition-all" 
-                    required 
-                  />
-               </div>
-               
-               <button 
-                type="submit" 
-                disabled={authLoading}
-                className="w-full py-4 gradient-bg text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:opacity-90 active:scale-95 transition-all mt-2 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center"
-               >
-                 {authLoading ? (
-                     <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                 ) : (
-                    authMode === 'signin' ? 'Sign In' : 'Create Account'
-                 )}
-               </button>
-            </form>
-
-            <div className="mt-8 text-center text-sm font-medium text-slate-500">
-              {authMode === 'signin' ? (
-                <>Don't have an account? <button onClick={() => setAuthMode('signup')} className="text-violet-600 hover:underline">Sign up</button></>
-              ) : (
-                <>Already have an account? <button onClick={() => setAuthMode('signin')} className="text-violet-600 hover:underline">Sign in</button></>
-              )}
-            </div>
-          </div>
+               <button onClick={handleGoogleLogin} className="w-full py-4 border border-slate-200 hover:bg-slate-50 mt-6 rounded-xl font-bold flex justify-center gap-3 text-slate-600 transition-colors"><Chrome size={20}/> Google Account</button>
+           </div>
         </div>
       )}
 
-      {/* Inspiration Modal */}
-      {activeModal === 'inspiration' && (
-        <div 
-          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveModal(null)}
-        >
-          <div 
-            className="relative w-full max-w-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 p-12 rounded-[2.5rem] text-white shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Background Decorative Blobs */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
-
-            <button 
-               onClick={() => setActiveModal(null)}
-               className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-white/70 hover:bg-white/20 hover:text-white transition-all"
-            >
-              <X size={20} />
-            </button>
-            
-            <div className="relative z-10 flex flex-col items-center text-center">
-              <div className="mb-8 flex justify-center">
-                <div className="p-6 bg-white/10 rounded-full ring-4 ring-white/5 shadow-inner">
-                   <Lightbulb size={48} className="text-yellow-300 fill-current drop-shadow-lg" />
-                </div>
-              </div>
-              
-              <h2 className="text-4xl md:text-5xl font-black mb-8 tracking-tight">Daily Inspiration</h2>
-              
-              <div className="relative">
-                <Sparkles className="absolute -top-6 -left-6 text-yellow-300 opacity-50 w-8 h-8" />
-                <blockquote className="text-2xl md:text-3xl font-medium leading-relaxed mb-8 italic text-white/95">
-                  "Creativity is intelligence having fun."
-                </blockquote>
-                <Sparkles className="absolute -bottom-6 -right-6 text-yellow-300 opacity-50 w-8 h-8" />
-              </div>
-              
-              <p className="text-white/80 text-lg mb-10 max-w-md leading-relaxed font-light">
-                Let these visuals spark your imagination and fuel your next big idea. Beauty is everywhere—you just have to look for it.
-              </p>
-
-              <button 
-                onClick={() => setActiveModal(null)}
-                className="bg-white text-violet-600 px-10 py-4 rounded-full font-bold text-lg uppercase tracking-wider hover:bg-violet-50 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-violet-900/20"
-              >
-                Get Inspired
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* About Us Modal */}
-      {activeModal === 'about' && (
-        <div 
-          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveModal(null)}
-        >
-          <div 
-            className="relative w-full max-w-2xl bg-white p-10 rounded-[2.5rem] shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
-              <X size={20} className="text-slate-500" />
-            </button>
-            
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-violet-100 text-violet-600 rounded-2xl mb-6">
-                <Info size={32} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-4">About Us</h2>
-              <div className="h-1 w-20 bg-gradient-to-r from-violet-500 to-fuchsia-500 mx-auto rounded-full mb-8"></div>
-              
-              <div className="text-slate-600 space-y-4 text-lg leading-relaxed">
-                <p>
-                  Welcome to <strong className="text-violet-600">{headerConfig.title}</strong>, a digital sanctuary for creatives, dreamers, and visionaries.
-                </p>
-                <p>
-                  Our mission is simple: to curate and share the most inspiring visual content from around the globe. Whether you're a designer looking for your next big idea, or simply someone who appreciates beauty, you've found your home.
-                </p>
-                <p>
-                  Founded in 2025, we believe that great design has the power to change the world. Join our community and let's create something beautiful together.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Privacy Policy Modal */}
-      {activeModal === 'privacy' && (
-        <div 
-          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveModal(null)}
-        >
-          <div 
-            className="relative w-full max-w-2xl bg-white p-10 rounded-[2.5rem] shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] flex flex-col" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200 transition-colors z-10">
-              <X size={20} className="text-slate-500" />
-            </button>
-            
-            <div className="text-center flex-shrink-0">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl mb-6">
-                <Shield size={32} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">Privacy Policy</h2>
-              <p className="text-slate-400 text-sm mb-6">Last updated: January 2025</p>
-            </div>
-
-            <div className="overflow-y-auto pr-2 text-slate-600 text-sm leading-relaxed space-y-4 text-left custom-scrollbar">
-              <p>
-                At <strong>{headerConfig.title}</strong>, we take your privacy seriously. This policy describes how we collect, use, and handle your information.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">1. Information We Collect</h3>
-              <p>
-                We collect information you provide directly to us, such as when you create an account, subscribe to our newsletter, or contact us for support. This may include your name, email address, and any other information you choose to provide.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">2. How We Use Information</h3>
-              <p>
-                We use the information we collect to operate, maintain, and improve our services, to develop new features, and to protect our users. We also use this information to communicate with you, such as to send you updates and security alerts.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">3. Data Security</h3>
-              <p>
-                We implement appropriate technical and organizational measures to protect the security of your personal information. However, please note that no system is completely secure.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">4. Contact Us</h3>
-              <p>
-                If you have any questions about this Privacy Policy, please contact us via our Contact form.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Terms of Service Modal */}
-      {activeModal === 'terms' && (
-        <div 
-          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveModal(null)}
-        >
-          <div 
-            className="relative w-full max-w-2xl bg-white p-10 rounded-[2.5rem] shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden max-h-[90vh] flex flex-col" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200 transition-colors z-10">
-              <X size={20} className="text-slate-500" />
-            </button>
-            
-            <div className="text-center flex-shrink-0">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl mb-6">
-                <FileText size={32} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">Terms of Service</h2>
-              <p className="text-slate-400 text-sm mb-6">Effective Date: January 2025</p>
-            </div>
-
-            <div className="overflow-y-auto pr-2 text-slate-600 text-sm leading-relaxed space-y-4 text-left custom-scrollbar">
-              <p>
-                Please read these Terms of Service ("Terms") carefully before using the <strong>{headerConfig.title}</strong> website.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">1. Acceptance of Terms</h3>
-              <p>
-                By accessing or using our Service, you agree to be bound by these Terms. If you disagree with any part of the terms, then you may not access the Service.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">2. Content</h3>
-              <p>
-                Our Service allows you to post, link, store, share and otherwise make available certain information, text, graphics, videos, or other material ("Content"). You are responsible for the Content that you post to the Service, including its legality, reliability, and appropriateness.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">3. Accounts</h3>
-              <p>
-                 When you create an account with us, you must provide us information that is accurate, complete, and current at all times. Failure to do so constitutes a breach of the Terms, which may result in immediate termination of your account on our Service.
-              </p>
-              <h3 className="text-slate-900 font-bold text-lg mt-4">4. Termination</h3>
-              <p>
-                We may terminate or suspend access to our Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Contact Us Modal */}
-      {activeModal === 'contact' && (
-        <div 
-          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveModal(null)}
-        >
-          <div 
-            className="relative w-full max-w-xl bg-white p-10 rounded-[2.5rem] shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 overflow-hidden" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => setActiveModal(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
-              <X size={20} className="text-slate-500" />
-            </button>
-            
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-pink-100 text-pink-600 rounded-2xl mb-6">
-                <Mail size={32} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">Get in Touch</h2>
-              <p className="text-slate-500">We'd love to hear from you. Send us a message!</p>
-            </div>
-
-            <form onSubmit={handleContactSubmit} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Your Name</label>
-                <input required type="text" placeholder="John Doe" className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all outline-none font-medium" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
-                <input required type="email" placeholder="john@example.com" className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all outline-none font-medium" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Message</label>
-                <textarea required rows={4} placeholder="How can we help you?" className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:border-violet-500 focus:ring-2 focus:ring-violet-200 transition-all outline-none font-medium resize-none"></textarea>
-              </div>
-              
-              <button type="submit" className="w-full py-4 gradient-bg text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2">
-                <Send size={18} />
-                Send Message
-              </button>
-            </form>
-          </div>
-        </div>
+      {/* Profile Settings Modal */}
+      {activeModal === 'profile' && currentUser && (
+        <ProfileSettings 
+            user={currentUser}
+            onClose={() => setActiveModal(null)}
+            onSave={handleUpdateProfile}
+        />
       )}
     </div>
   );

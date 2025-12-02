@@ -5,7 +5,9 @@ export interface MediaItem {
   url: string;
   name: string;
   title?: string;
+  description?: string;
   link?: string;
+  category?: string; // New feature: Category support
   likes: number;
   views: number;
   likedByUser: boolean;
@@ -35,11 +37,19 @@ export interface BlogPostData {
   excerpt: string;
   date: string;
   author: string;
+  authorAvatar?: string;
   readTime: string;
+  content?: string;
+  imageUrl?: string;
+  tags?: string[];
 }
 
 export interface User {
   name: string;
   email: string;
   avatar?: string;
+  password?: string; // Only used internally for auth checks
+  bio?: string;
+  location?: string;
+  website?: string;
 }

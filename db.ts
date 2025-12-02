@@ -2,12 +2,12 @@
 import { HeaderConfig, MediaItem, User } from './types';
 
 const DB_NAME = 'CreativeSpaceDB';
-const DB_VERSION = 2; // Incremented for Users store
+const DB_VERSION = 2;
 const STORE_MEDIA = 'media';
 const STORE_CONFIG = 'config';
 const STORE_USERS = 'users';
 
-// Seed data to make the app look alive immediately
+// Seed data with Categories
 const SEED_DATA: Partial<MediaItem>[] = [
   {
     id: 'seed-1',
@@ -15,6 +15,7 @@ const SEED_DATA: Partial<MediaItem>[] = [
     url: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     name: 'Mountain Landscape',
     title: 'Alpine Dreams',
+    category: 'Photography',
     likes: 124,
     views: 1540,
     likedByUser: false,
@@ -28,6 +29,7 @@ const SEED_DATA: Partial<MediaItem>[] = [
     url: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     name: 'Student Life',
     title: 'Study Session',
+    category: 'Lifestyle',
     likes: 89,
     views: 890,
     likedByUser: false,
@@ -41,6 +43,7 @@ const SEED_DATA: Partial<MediaItem>[] = [
     url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     name: 'Tech Setup',
     title: 'Workspace Goals',
+    category: 'Tech',
     likes: 432,
     views: 5200,
     likedByUser: false,
@@ -54,6 +57,7 @@ const SEED_DATA: Partial<MediaItem>[] = [
     url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     name: 'Abstract Art',
     title: 'Liquid Colors',
+    category: 'Art',
     likes: 215,
     views: 3100,
     likedByUser: true,
@@ -101,7 +105,7 @@ const seedDatabase = async (db: IDBDatabase) => {
      };
      
      transaction.oncomplete = () => resolve();
-     transaction.onerror = () => resolve(); // Don't fail if seed fails
+     transaction.onerror = () => resolve(); 
   });
 };
 
@@ -121,8 +125,6 @@ export const saveMediaItemToDB = async (item: MediaItem) => {
             dataToSave.blob = existing.blob;
         }
         
-        // Remove the object URL string before saving if it's a blob URL
-        // If it's an http URL (seed data), keep it
         const { url, ...dbRecord } = dataToSave;
         if (url && !url.startsWith('http')) {
              // It's a blob url, don't save it
@@ -140,7 +142,7 @@ export const saveMediaItemToDB = async (item: MediaItem) => {
 
 export const getMediaItemsFromDB = async (): Promise<MediaItem[]> => {
   const db = await initDB();
-  await seedDatabase(db); // Ensure seed data exists
+  await seedDatabase(db); 
 
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_MEDIA], 'readonly');
@@ -149,7 +151,6 @@ export const getMediaItemsFromDB = async (): Promise<MediaItem[]> => {
 
     request.onsuccess = () => {
       const items = request.result;
-      // Convert blobs back to URLs or use stored URL
       const hydratedItems = items.map((item: any) => ({
         ...item,
         url: item.blob ? URL.createObjectURL(item.blob) : (item.url || '')
@@ -171,7 +172,6 @@ export const deleteMediaItemFromDB = async (id: string) => {
   });
 };
 
-// Only delete items belonging to the specific user
 export const deleteUserMediaFromDB = async (userId: string) => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
@@ -225,7 +225,17 @@ export const getConfigFromDB = async (): Promise<HeaderConfig | null> => {
     });
   };
 
-// --- AUTHENTICATION FUNCTIONS ---
+// Generic save/upsert user function to handle Google Login and recovery
+export const saveUserToDB = async (user: User): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_USERS], 'readwrite');
+        const store = transaction.objectStore(STORE_USERS);
+        store.put(user);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
 
 export const registerUser = async (email: string, password: string, name: string): Promise<User> => {
     const db = await initDB();
@@ -233,7 +243,6 @@ export const registerUser = async (email: string, password: string, name: string
         const transaction = db.transaction([STORE_USERS], 'readwrite');
         const store = transaction.objectStore(STORE_USERS);
         
-        // Check if user exists
         const checkRequest = store.get(email);
         
         checkRequest.onsuccess = () => {
@@ -242,10 +251,9 @@ export const registerUser = async (email: string, password: string, name: string
                 return;
             }
             
-            // Create new user
             const newUser = {
                 email,
-                password, // Note: storing plain text password is insecure for production, okay for local demo
+                password, 
                 name,
                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(' ', '')}`
             };
@@ -277,6 +285,62 @@ export const authenticateUser = async (email: string, password: string): Promise
             } else {
                 reject(new Error("Invalid email or password"));
             }
+        };
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const updateUser = async (email: string, updates: Partial<User>): Promise<User> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_USERS], 'readwrite');
+        const store = transaction.objectStore(STORE_USERS);
+        
+        const request = store.get(email);
+        
+        request.onsuccess = () => {
+            const user = request.result;
+            if (!user) {
+                reject(new Error("User not found"));
+                return;
+            }
+            
+            const updatedUser = { ...user, ...updates };
+            const putRequest = store.put(updatedUser);
+            
+            putRequest.onsuccess = () => {
+                const { password, ...safeUser } = updatedUser;
+                resolve(safeUser);
+            };
+            putRequest.onerror = () => reject(putRequest.error);
+        };
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const changePassword = async (email: string, oldPass: string, newPass: string): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_USERS], 'readwrite');
+        const store = transaction.objectStore(STORE_USERS);
+        
+        const request = store.get(email);
+        
+        request.onsuccess = () => {
+            const user = request.result;
+            if (!user) {
+                reject(new Error("User not found"));
+                return;
+            }
+            
+            if (user.password !== oldPass) {
+                reject(new Error("Incorrect old password"));
+                return;
+            }
+            
+            user.password = newPass;
+            store.put(user);
+            resolve();
         };
         request.onerror = () => reject(request.error);
     });
