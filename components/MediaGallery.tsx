@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, User, Plus, Grid, List, Layers, Edit2, Link as LinkIcon, Check, X } from 'lucide-react';
+import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, User, Plus, Grid, List, Layers, Edit2, Link as LinkIcon, Check, X, AlertCircle } from 'lucide-react';
 import { MediaItem, User as UserType } from '../types';
 
 interface MediaGalleryProps {
@@ -25,6 +25,10 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // Delete Confirmation State
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isClearingConfirm, setIsClearingConfirm] = useState(false);
 
   // Edit State
   const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
@@ -95,6 +99,27 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (deleteConfirmId === id) {
+        onRemoveItem(id);
+        setDeleteConfirmId(null);
+    } else {
+        setDeleteConfirmId(id);
+        setTimeout(() => setDeleteConfirmId(null), 3000); // Auto reset
+    }
+  };
+
+  const handleClearClick = () => {
+    if (isClearingConfirm) {
+        onClearAll();
+        setIsClearingConfirm(false);
+    } else {
+        setIsClearingConfirm(true);
+        setTimeout(() => setIsClearingConfirm(false), 3000);
+    }
+  };
+
   return (
     <>
       <div className={`min-h-[400px] transition-all duration-300 rounded-[2.5rem] ${isDragging ? 'bg-indigo-50 border-2 border-dashed border-indigo-400 scale-[1.01]' : ''}`}
@@ -119,7 +144,12 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             <div className="flex gap-2">
               <button onClick={() => imageInputRef.current?.click()} className="px-5 py-2.5 bg-slate-900 text-white rounded-full font-bold text-xs flex gap-2 items-center hover:bg-slate-800 transition-all hover:-translate-y-0.5 shadow-lg shadow-slate-200"><ImageIcon size={14}/> Photos</button>
               <button onClick={() => videoInputRef.current?.click()} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-full font-bold text-xs flex gap-2 items-center hover:bg-slate-50 transition-all hover:-translate-y-0.5"><Film size={14}/> Video</button>
-              <button onClick={() => { if(confirm('Clear gallery?')) onClearAll(); }} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all ml-2"><Trash2 size={18}/></button>
+              <button 
+                onClick={handleClearClick} 
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ml-2 text-xs font-bold ${isClearingConfirm ? 'bg-red-600 text-white shadow-lg shadow-red-200' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+              >
+                 {isClearingConfirm ? <><Check size={16}/> Confirm</> : <Trash2 size={18}/>}
+              </button>
             </div>
           </div>
         )}
@@ -224,7 +254,12 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                       <button onClick={(e) => startEditing(e, item)} className="p-2 text-slate-400 hover:text-purple-600 transition-colors"><Edit2 size={18} /></button>
                                    )}
                                    {allowUpload && (
-                                       <button onClick={(e) => { e.stopPropagation(); onRemoveItem(item.id); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                                       <button 
+                                          onClick={(e) => handleDeleteClick(e, item.id)} 
+                                          className={`p-2 transition-all rounded-full ${deleteConfirmId === item.id ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-red-500'}`}
+                                        >
+                                          {deleteConfirmId === item.id ? <Check size={18} /> : <Trash2 size={18}/>}
+                                        </button>
                                    )}
                                 </div>
                             </div>
@@ -246,7 +281,12 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                     {viewMode === 'grid' && allowUpload && (
                         <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                              <button onClick={(e) => startEditing(e, item)} className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-purple-600 shadow-sm"><Edit2 size={14}/></button>
-                             <button onClick={(e) => { e.stopPropagation(); onRemoveItem(item.id); }} className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-red-600 shadow-sm"><Trash2 size={14}/></button>
+                             <button 
+                                onClick={(e) => handleDeleteClick(e, item.id)} 
+                                className={`p-2 backdrop-blur-md rounded-full shadow-sm transition-all ${deleteConfirmId === item.id ? 'bg-red-600 text-white' : 'bg-white/90 text-slate-600 hover:text-red-600'}`}
+                             >
+                               {deleteConfirmId === item.id ? <Check size={14}/> : <Trash2 size={14}/>}
+                             </button>
                         </div>
                     )}
                     

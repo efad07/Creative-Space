@@ -42,6 +42,9 @@ export interface BlogPostData {
   content?: string;
   imageUrl?: string;
   tags?: string[];
+  timestamp?: number; // Added for 24h expiration logic
+  userId?: string;
+  link?: string; // Added for story external links
 }
 
 export interface User {

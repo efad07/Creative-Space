@@ -4,71 +4,40 @@ import Header from './components/Header';
 import MediaGallery from './components/MediaGallery';
 import Lightbox from './components/Lightbox';
 import Toast from './components/Toast';
-import BlogPost from './components/BlogPost';
 import SearchBar from './components/SearchBar';
 import GoogleAd from './components/GoogleAd';
 import StoryViewer from './components/StoryViewer';
 import ProfileSettings from './components/ProfileSettings';
+import AuthModal from './components/AuthModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData } from './types';
-import { Chrome, LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings } from 'lucide-react';
+import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB } from './db';
 
-// Sample Data for Blog
+// Sample Data for Blog with Timestamps for Expiration Logic
 const INITIAL_STORIES: BlogPostData[] = [
   {
     id: '1',
     title: 'The Art of Minimalist Photography',
-    excerpt: 'Discover how less can be more. We explore the techniques behind stunning minimalist compositions.',
-    date: 'Mar 15, 2025',
+    excerpt: 'Discover how less can be more.',
+    date: 'Today',
     author: 'Elena Fisher',
     readTime: '5 min',
     imageUrl: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-    tags: ['Photography', 'Minimalism'],
-    content: `<p>Full content...</p>`
+    tags: ['Photography'],
+    content: `<p>Full content...</p>`,
+    timestamp: Date.now()
   },
   {
     id: '2',
     title: 'Color Theory in Digital Design',
-    excerpt: 'Understanding the psychological impact of color is crucial for any designer.',
-    date: 'Mar 12, 2025',
+    excerpt: 'Understanding the psychological impact of color.',
+    date: 'Today',
     author: 'Marcus Chen',
     readTime: '8 min',
     imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-    tags: ['Design', 'UX'],
-    content: `<p>Full content...</p>`
-  },
-  {
-    id: '3',
-    title: 'Capturing Urban Solitude',
-    excerpt: 'A photo essay on finding silence in the chaos of the city.',
-    date: 'Mar 10, 2025',
-    author: 'Sarah Jenkins',
-    readTime: '6 min',
-    imageUrl: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-    tags: ['Urban', 'Travel'],
-    content: `<p>Full content...</p>`
-  },
-  {
-    id: '4',
-    title: 'Modern Architecture',
-    excerpt: 'The lines between nature and structure are blurring in modern architectural trends.',
-    date: 'Mar 08, 2025',
-    author: 'David Wright',
-    readTime: '4 min',
-    imageUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-    tags: ['Architecture', 'Design'],
-    content: `<p>Full content...</p>`
-  },
-  {
-    id: '5',
-    title: 'Neon Nights',
-    excerpt: 'Cyberpunk aesthetics in real world photography.',
-    date: 'Mar 05, 2025',
-    author: 'Alice V.',
-    readTime: '3 min',
-    imageUrl: 'https://images.unsplash.com/photo-1555685812-4b943f3e9942?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-    tags: ['Photography', 'Neon'],
-    content: `<p>Full content...</p>`
+    tags: ['Design'],
+    content: `<p>Full content...</p>`,
+    timestamp: Date.now() - 3600000 // 1 hour ago
   }
 ];
 
@@ -88,6 +57,7 @@ const App: React.FC = () => {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [activeModal, setActiveModal] = useState<'auth' | 'profile' | null>(null);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   
   // Story States
   const [stories, setStories] = useState<BlogPostData[]>(INITIAL_STORIES);
@@ -95,8 +65,13 @@ const App: React.FC = () => {
   const [viewingStoryIndex, setViewingStoryIndex] = useState<number | null>(null); // For Story Player
   const [watchedStories, setWatchedStories] = useState<string[]>([]);
   const storyInputRef = useRef<HTMLInputElement>(null);
+  
+  // Story Upload Modal States
+  const [showStoryUploadModal, setShowStoryUploadModal] = useState(false);
+  const [tempStoryImg, setTempStoryImg] = useState<string | null>(null);
+  const [newStoryTitle, setNewStoryTitle] = useState('');
+  const [newStoryLink, setNewStoryLink] = useState('');
 
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeNav, setActiveNav] = useState('All');
   
@@ -107,11 +82,16 @@ const App: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState(true);
 
-  // Auth Form State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+  // Track ObjectURLs to revoke them on unmount to prevent memory leaks
+  const objectUrlsRef = useRef<string[]>([]);
+
+  // --- Derived State for Stories (24h Expiration) ---
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const activeStories = stories.filter(story => {
+    // If no timestamp, assume it's valid (or could assume invalid, but legacy support implies valid)
+    if (!story.timestamp) return true;
+    return (Date.now() - story.timestamp) < ONE_DAY_MS;
+  });
 
   // --- Initialization ---
   useEffect(() => {
@@ -119,14 +99,30 @@ const App: React.FC = () => {
       try {
         const savedUser = localStorage.getItem('creative_space_user');
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
+        
         const savedConfig = await getConfigFromDB();
         if (savedConfig) setHeaderConfig(savedConfig);
+        
         const savedMedia = await getMediaItemsFromDB();
+        
+        // Track URLs created by getMediaItemsFromDB for cleanup
+        savedMedia.forEach(item => {
+            if (item.url.startsWith('blob:')) {
+                objectUrlsRef.current.push(item.url);
+            }
+        });
+
         setMediaItems(savedMedia);
         
         // Load watched stories
         const savedWatched = localStorage.getItem('creative_space_watched_stories');
         if(savedWatched) setWatchedStories(JSON.parse(savedWatched));
+
+        // Load custom stories if any (Persistence Logic)
+        const savedStories = localStorage.getItem('creative_space_stories');
+        if(savedStories) {
+            setStories(JSON.parse(savedStories));
+        }
       } catch (error) {
         console.error("Failed to load data", error);
       } finally {
@@ -134,7 +130,24 @@ const App: React.FC = () => {
       }
     };
     loadData();
+
+    // Cleanup function to release memory when app unmounts
+    return () => {
+        objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        objectUrlsRef.current = [];
+    };
   }, []);
+
+  // Helper to persist stories
+  const saveStoriesToLocal = (newStories: BlogPostData[]) => {
+      setStories(newStories);
+      try {
+          // Limit storage usage by only storing recent ones if needed, but for now allow all
+          localStorage.setItem('creative_space_stories', JSON.stringify(newStories));
+      } catch (e) {
+          console.error("Failed to save stories locally (quota?)", e);
+      }
+  };
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -171,6 +184,13 @@ const App: React.FC = () => {
   const addMediaItems = async (newItems: MediaItem[]) => {
     const authorInfo = getCurrentAuthorInfo();
     
+    // Add new blob URLs to our tracking ref
+    newItems.forEach(item => {
+        if (item.url.startsWith('blob:')) {
+            objectUrlsRef.current.push(item.url);
+        }
+    });
+
     const itemsWithUser = newItems.map(item => ({
       ...item,
       userId: authorInfo.email,
@@ -182,6 +202,7 @@ const App: React.FC = () => {
     for (const item of itemsWithUser) {
         if (item.url && item.url.startsWith('blob:')) {
             try {
+                // We fetch the blob from the objectURL to store it in DB
                 const response = await fetch(item.url);
                 const blob = await response.blob();
                 await saveMediaItemToDB({ ...item, blob });
@@ -202,14 +223,31 @@ const App: React.FC = () => {
   };
 
   const removeMediaItem = async (id: string) => {
-    setMediaItems(prev => prev.filter(item => item.id !== id));
+    setMediaItems(prev => prev.filter(item => {
+        if (item.id === id && item.url.startsWith('blob:')) {
+            URL.revokeObjectURL(item.url); // Release memory immediately
+        }
+        return item.id !== id;
+    }));
     await deleteMediaItemFromDB(id);
     showToast('Item deleted', 'success');
   };
 
   const clearAllMedia = async () => {
     if (!currentUser?.email) return;
-    setMediaItems(prev => prev.filter(item => item.userId !== currentUser.email));
+    
+    setMediaItems(prev => {
+        const remaining: MediaItem[] = [];
+        prev.forEach(item => {
+            if (item.userId === currentUser.email) {
+                if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
+            } else {
+                remaining.push(item);
+            }
+        });
+        return remaining;
+    });
+
     await deleteUserMediaFromDB(currentUser.email);
     showToast('Gallery cleared', 'success');
   };
@@ -217,6 +255,7 @@ const App: React.FC = () => {
   const handleSaveItem = async (item: MediaItem) => {
     if (!currentUser) {
         showToast('Please sign in to save items', 'error');
+        setAuthMode('signin');
         setActiveModal('auth');
         return;
     }
@@ -252,7 +291,7 @@ const App: React.FC = () => {
     setMediaItems(prev => prev.map(item => {
         if (item.id === id) {
             const isLiked = !item.likedByUser;
-            const updated = { ...item, likedByUser: isLiked, likes: isLiked ? item.likes + 1 : item.likes - 1 };
+            const updated = { ...item, likedByUser: isLiked ? item.likes + 1 : item.likes - 1 };
             saveMediaItemToDB(updated);
             return updated;
         }
@@ -273,7 +312,8 @@ const App: React.FC = () => {
 
   const handleStoryOpen = (index: number) => {
     setViewingStoryIndex(index);
-    const storyId = stories[index].id;
+    // Use activeStories to ensure index match
+    const storyId = activeStories[index].id;
     if (!watchedStories.includes(storyId)) {
         const newWatched = [...watchedStories, storyId];
         setWatchedStories(newWatched);
@@ -281,12 +321,14 @@ const App: React.FC = () => {
     }
   };
 
+  // 1. Initial File Select -> Open Modal
   const handleStoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!currentUser) {
         showToast('Please sign in to post stories', 'error');
+        setAuthMode('signin');
         setActiveModal('auth');
         return;
     }
@@ -294,26 +336,56 @@ const App: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
         if (typeof event.target?.result === 'string') {
-            const authorInfo = getCurrentAuthorInfo();
-            const newStory: BlogPostData = {
-                id: Math.random().toString(36).substr(2, 9),
-                title: 'New Story',
-                excerpt: 'Just posted a new story!',
-                date: 'Just now',
-                author: authorInfo.name,
-                authorAvatar: authorInfo.avatar,
-                readTime: '1 min',
-                imageUrl: event.target.result,
-                tags: ['Story', 'New'],
-                content: '<p>New story update...</p>'
-            };
-            setStories(prev => [newStory, ...prev]);
-            showToast('Your story has been added!', 'success');
+            setTempStoryImg(event.target.result);
+            setNewStoryTitle('');
+            setNewStoryLink('');
+            setShowStoryUploadModal(true);
         }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
+
+  // 2. Finalize Upload from Modal
+  const finalizeStoryUpload = () => {
+      if (!tempStoryImg) return;
+      
+      const authorInfo = getCurrentAuthorInfo();
+      const newStory: BlogPostData = {
+          id: Math.random().toString(36).substr(2, 9),
+          title: newStoryTitle || 'New Story',
+          excerpt: newStoryTitle || 'Just posted a new story!',
+          date: 'Just now',
+          author: authorInfo.name,
+          authorAvatar: authorInfo.avatar,
+          userId: authorInfo.email,
+          readTime: '1 min',
+          imageUrl: tempStoryImg,
+          tags: ['Story'],
+          content: '<p>New story update...</p>',
+          timestamp: Date.now(),
+          link: newStoryLink || undefined
+      };
+
+      const updatedStories = [newStory, ...stories];
+      saveStoriesToLocal(updatedStories);
+      
+      setShowStoryUploadModal(false);
+      setTempStoryImg(null);
+      showToast('Your story has been added!', 'success');
+  };
+
+  const handleDeleteStory = (storyId: string) => {
+    const updatedStories = stories.filter(s => s.id !== storyId);
+    saveStoriesToLocal(updatedStories);
+    showToast('Story deleted', 'success');
+  }
+
+  const handleUpdateStory = (storyId: string, updates: Partial<BlogPostData>) => {
+    const updatedStories = stories.map(s => s.id === storyId ? {...s, ...updates} : s);
+    saveStoriesToLocal(updatedStories);
+    showToast('Story updated', 'success');
+  }
 
   const getDisplayedItems = () => {
     let items = mediaItems;
@@ -324,9 +396,8 @@ const App: React.FC = () => {
   };
 
   const displayedItems = getDisplayedItems();
-  const displayedPosts = stories.filter(post => !searchQuery || post.title.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  // Auth & Nav Handlers
+  
+  // Auth Handlers
   const handleAuthClick = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
     setActiveModal('auth');
@@ -339,7 +410,10 @@ const App: React.FC = () => {
     showToast('Logged out', 'success');
   };
 
-  const handleGoogleLogin = async () => {
+  const onGoogleLogin = async () => {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
       const user = { name: "Google User", email: "google@user.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Google" };
       try {
         await saveUserToDB(user);
@@ -349,23 +423,27 @@ const App: React.FC = () => {
       
       setCurrentUser(user);
       localStorage.setItem('creative_space_user', JSON.stringify(user));
-      setActiveModal(null);
       showToast('Signed in with Google', 'success');
   };
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setAuthLoading(true);
-      try {
-          const user = authMode === 'signup' 
-            ? await registerUser(email, password, name) 
-            : await authenticateUser(email, password);
-          setCurrentUser(user);
-          localStorage.setItem('creative_space_user', JSON.stringify(user));
-          setActiveModal(null);
-          showToast('Success!', 'success');
-      } catch(e: any) { showToast(e.message, 'error'); } 
-      finally { setAuthLoading(false); }
+  const onEmailLogin = async (email: string, pass: string) => {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const user = await authenticateUser(email, pass);
+      setCurrentUser(user);
+      localStorage.setItem('creative_space_user', JSON.stringify(user));
+      showToast('Welcome back!', 'success');
+      return user;
+  };
+
+  const onEmailRegister = async (email: string, pass: string, name: string) => {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const user = await registerUser(email, pass, name);
+      setCurrentUser(user);
+      localStorage.setItem('creative_space_user', JSON.stringify(user));
+      showToast('Account created successfully!', 'success');
+      return user;
   };
   
   const handleUpdateProfile = async (updates: Partial<User>) => {
@@ -375,7 +453,6 @@ const App: React.FC = () => {
           try {
              updatedUser = await updateUser(currentUser.email, updates);
           } catch (dbError: any) {
-             // If user missing in DB (cleared cache or Google login issue), try to recover
              if (dbError.message === "User not found") {
                  const recoveredUser = { ...currentUser, ...updates };
                  await saveUserToDB(recoveredUser);
@@ -397,7 +474,6 @@ const App: React.FC = () => {
              const newName = updatedUser.name;
              const newAvatar = updatedUser.avatar;
 
-             // 1. Update Gallery Items
              setMediaItems(prev => prev.map(item => {
                  if (item.userId === currentUser.email) {
                      const updatedItem = { ...item, authorName: newName, authorAvatar: newAvatar };
@@ -407,13 +483,14 @@ const App: React.FC = () => {
                  return item;
              }));
 
-             // 2. Update Stories
-             setStories(prev => prev.map(story => {
-                if (story.author === currentUser.name) {
+             // Update stories and persist
+             const updatedStories = stories.map(story => {
+                if (story.userId === currentUser.email) {
                     return { ...story, author: newName, authorAvatar: newAvatar };
                 }
                 return story;
-             }));
+             });
+             saveStoriesToLocal(updatedStories);
           }
 
           showToast('Profile updated successfully', 'success');
@@ -473,34 +550,36 @@ const App: React.FC = () => {
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
         
-        {/* Story Tray */}
+        {/* Story Tray (Showing active stories only) */}
         <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0">
           <div className="flex gap-4 min-w-max">
-            {/* My Story (Add) */}
-            <div 
-                className="flex flex-col items-center gap-2 cursor-pointer group" 
-                onClick={() => storyInputRef.current?.click()}
-            >
-               <input 
-                 type="file" 
-                 ref={storyInputRef} 
-                 onChange={handleStoryUpload} 
-                 className="hidden" 
-                 accept="image/*" 
-               />
-               <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform">
-                  <div className="absolute inset-0 rounded-full overflow-hidden opacity-60">
-                    <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(currentUser?.name || 'guest').replace(/\s/g, '')}`} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm">
-                    <Plus size={14} strokeWidth={3}/>
-                  </div>
-               </div>
-               <span className="text-xs font-semibold text-slate-500">Your Story</span>
-            </div>
+            {/* My Story (Add) - Only visible in My Gallery */}
+            {activeNav === 'My Gallery' && (
+                <div 
+                    className="flex flex-col items-center gap-2 cursor-pointer group" 
+                    onClick={() => storyInputRef.current?.click()}
+                >
+                   <input 
+                     type="file" 
+                     ref={storyInputRef} 
+                     onChange={handleStoryUpload} 
+                     className="hidden" 
+                     accept="image/*" 
+                   />
+                   <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform">
+                      <div className="absolute inset-0 rounded-full overflow-hidden opacity-60">
+                        <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(currentUser?.name || 'guest').replace(/\s/g, '')}`} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm">
+                        <Plus size={14} strokeWidth={3}/>
+                      </div>
+                   </div>
+                   <span className="text-xs font-semibold text-slate-500">Your Story</span>
+                </div>
+            )}
 
             {/* Other Stories */}
-            {stories.map((story, index) => {
+            {activeStories.map((story, index) => {
                const isWatched = watchedStories.includes(story.id);
                return (
                 <div key={story.id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => handleStoryOpen(index)}>
@@ -634,14 +713,61 @@ const App: React.FC = () => {
       {/* Immersive Story Viewer */}
       {viewingStoryIndex !== null && (
         <StoryViewer 
-            stories={stories} 
+            stories={activeStories} 
             initialIndex={viewingStoryIndex} 
             onClose={() => setViewingStoryIndex(null)}
             onReadMore={(story) => {
                 setViewingStoryIndex(null);
                 setActiveStory(story);
             }}
+            currentUser={currentUser}
+            onDelete={handleDeleteStory}
+            onUpdate={handleUpdateStory}
         />
+      )}
+
+      {/* Story Upload Modal */}
+      {showStoryUploadModal && tempStoryImg && (
+        <div className="fixed inset-0 z-[2000] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="p-6">
+                 <h3 className="text-2xl font-black text-slate-900 mb-6">New Story</h3>
+                 <div className="aspect-[9/16] w-32 rounded-xl overflow-hidden shadow-lg mx-auto mb-6 bg-slate-100 border border-slate-200">
+                    <img src={tempStoryImg} className="w-full h-full object-cover" />
+                 </div>
+                 
+                 <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Title / Caption</label>
+                        <input 
+                           value={newStoryTitle}
+                           onChange={e => setNewStoryTitle(e.target.value)}
+                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold"
+                           placeholder="Add a caption..."
+                           autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Link (Optional)</label>
+                        <div className="relative">
+                            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input 
+                               value={newStoryLink}
+                               onChange={e => setNewStoryLink(e.target.value)}
+                               className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-medium text-sm"
+                               placeholder="https://..."
+                            />
+                        </div>
+                    </div>
+                 </div>
+
+                 <div className="flex gap-3 mt-8">
+                     <button onClick={finalizeStoryUpload} className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-purple-200"><Check size={18}/> Post Story</button>
+                     <button onClick={() => {setShowStoryUploadModal(false); setTempStoryImg(null);}} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"><X size={18}/> Cancel</button>
+                 </div>
+              </div>
+           </div>
+        </div>
       )}
 
       {/* Story Reader Modal (Long Form) */}
@@ -667,27 +793,15 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Auth Modal */}
+      {/* Auth Modal (New) */}
       {activeModal === 'auth' && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setActiveModal(null)}>
-           <div className="bg-white p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-               <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-6 mx-auto"><Chrome size={32}/></div>
-               <h2 className="text-3xl font-black mb-2 text-center text-slate-900">{authMode === 'signin' ? 'Welcome Back' : 'Create Account'}</h2>
-               <p className="text-center text-slate-500 mb-8">Enter your details to access your creative space.</p>
-               <form onSubmit={handleEmailAuth} className="space-y-4">
-                   {authMode === 'signup' && <input placeholder="Full Name" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition-colors font-medium" value={name} onChange={e => setName(e.target.value)} />}
-                   <input placeholder="Email Address" type="email" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition-colors font-medium" value={email} onChange={e => setEmail(e.target.value)} />
-                   <input placeholder="Password" type="password" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition-colors font-medium" value={password} onChange={e => setPassword(e.target.value)} />
-                   <button className="w-full py-4 bg-slate-900 hover:bg-purple-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-purple-200">{authLoading ? 'Processing...' : (authMode === 'signin' ? 'Sign In' : 'Sign Up')}</button>
-               </form>
-               <div className="mt-6 flex items-center justify-center gap-4">
-                   <div className="h-px bg-slate-200 flex-1"></div>
-                   <span className="text-xs font-bold text-slate-400 uppercase">Or continue with</span>
-                   <div className="h-px bg-slate-200 flex-1"></div>
-               </div>
-               <button onClick={handleGoogleLogin} className="w-full py-4 border border-slate-200 hover:bg-slate-50 mt-6 rounded-xl font-bold flex justify-center gap-3 text-slate-600 transition-colors"><Chrome size={20}/> Google Account</button>
-           </div>
-        </div>
+        <AuthModal 
+          initialMode={authMode}
+          onClose={() => setActiveModal(null)}
+          onLogin={onEmailLogin}
+          onRegister={onEmailRegister}
+          onGoogleLogin={onGoogleLogin}
+        />
       )}
 
       {/* Profile Settings Modal */}
