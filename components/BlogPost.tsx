@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Calendar, User, ArrowRight, Clock, Tag } from 'lucide-react';
+import { User, ArrowRight } from 'lucide-react';
 import { BlogPostData } from '../types';
 
 interface BlogPostProps {

@@ -1,5 +1,6 @@
+
 import React, { useEffect } from 'react';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { ToastMessage } from '../types';
 
 interface ToastProps {

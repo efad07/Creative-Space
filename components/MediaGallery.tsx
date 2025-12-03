@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, User, Plus, Grid, List, Layers, Edit2, Link as LinkIcon, Check, X, AlertCircle } from 'lucide-react';
+import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, Plus, Layers, Edit2, Link as LinkIcon, Check, X } from 'lucide-react';
 import { MediaItem, User as UserType } from '../types';
 
 interface MediaGalleryProps {

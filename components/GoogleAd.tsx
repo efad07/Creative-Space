@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface GoogleAdProps {
   className?: string;
@@ -25,7 +25,6 @@ const GoogleAd: React.FC<GoogleAdProps> = ({
   style = { display: 'block' }
 }) => {
   const adRef = useRef<HTMLModElement>(null);
-  const [adError, setAdError] = useState(false);
 
   useEffect(() => {
     try {
@@ -40,7 +39,6 @@ const GoogleAd: React.FC<GoogleAdProps> = ({
       return () => clearTimeout(timer);
     } catch (e) {
       console.error("AdSense failed to load", e);
-      setAdError(true);
     }
   }, []);
 

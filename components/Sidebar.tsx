@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { ArrowRight, Box, Hash, User, Bookmark } from 'lucide-react';
+import { ArrowRight, Box, Hash, User } from 'lucide-react';
 
 interface SidebarProps {
   title: string;

@@ -90,7 +90,7 @@ export const initDB = (): Promise<IDBDatabase> => {
 };
 
 const seedDatabase = async (db: IDBDatabase) => {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<void>((resolve) => {
      const transaction = db.transaction([STORE_MEDIA], 'readwrite');
      const store = transaction.objectStore(STORE_MEDIA);
      

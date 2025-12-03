@@ -291,7 +291,11 @@ const App: React.FC = () => {
     setMediaItems(prev => prev.map(item => {
         if (item.id === id) {
             const isLiked = !item.likedByUser;
-            const updated = { ...item, likedByUser: isLiked ? item.likes + 1 : item.likes - 1 };
+            const updated = { 
+                ...item, 
+                likedByUser: isLiked,
+                likes: isLiked ? item.likes + 1 : item.likes - 1
+            };
             saveMediaItemToDB(updated);
             return updated;
         }
