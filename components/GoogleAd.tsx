@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 
 interface GoogleAdProps {
@@ -18,7 +17,7 @@ declare global {
 
 const GoogleAd: React.FC<GoogleAdProps> = ({ 
   className = "", 
-  client = "ca-pub-0000000000000000", // Default placeholder ID
+  client = "ca-pub-9524469096599112", // Updated default ID
   slot = "0000000000", 
   format = "auto",
   layoutKey,
