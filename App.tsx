@@ -93,6 +93,24 @@ const App: React.FC = () => {
     return (Date.now() - story.timestamp) < ONE_DAY_MS;
   });
 
+  // Scroll Reveal Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    // Delay slightly to ensure DOM is ready
+    setTimeout(() => {
+      document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    }, 500);
+
+    return () => observer.disconnect();
+  }, [mediaItems, activeNav, viewMode, activeCategory]);
+
   // --- Initialization ---
   useEffect(() => {
     const loadData = async () => {
@@ -126,7 +144,8 @@ const App: React.FC = () => {
       } catch (error) {
         console.error("Failed to load data", error);
       } finally {
-        setIsLoading(false);
+        // Add a small artificial delay for the splash screen effect
+        setTimeout(() => setIsLoading(false), 800);
       }
     };
     loadData();
@@ -505,23 +524,28 @@ const App: React.FC = () => {
       }
   };
 
-  if (isLoading) return <div className="h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div></div>;
+  if (isLoading) return (
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 z-[9999]">
+      <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4"></div>
+      <h2 className="text-white text-xl font-bold animate-pulse">Loading Creative Space...</h2>
+    </div>
+  );
 
   return (
     <div className="min-h-screen text-slate-900 font-sans selection:bg-purple-200 selection:text-purple-900 relative overflow-x-hidden">
       <Toast toasts={toasts} removeToast={removeToast} />
       
       {/* Floating Navigation */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-2 py-2 flex items-center gap-1 transition-all duration-300 max-w-[95%]">
-        <button onClick={() => setActiveNav('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${activeNav === 'All' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
-        {currentUser && <button onClick={() => setActiveNav('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${activeNav === 'My Gallery' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-2 py-2 flex items-center gap-1 transition-all duration-300 max-w-[95%] animate-fade-up">
+        <button onClick={() => setActiveNav('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
+        {currentUser && <button onClick={() => setActiveNav('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
         
         <div className="w-px h-6 bg-slate-200/50 mx-2 hidden sm:block"></div>
 
         {currentUser ? (
            <div className="flex items-center gap-2 pr-1 pl-1">
              <div 
-                className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all bg-slate-200"
+                className="w-9 h-9 rounded-full overflow-hidden border-2 border-white shadow-sm cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all bg-slate-200 hover:scale-110 active:scale-90"
                 onClick={() => setActiveModal('profile')}
              >
                {currentUser.avatar ? (
@@ -532,15 +556,15 @@ const App: React.FC = () => {
                  </div>
                )}
              </div>
-             <button onClick={() => setActiveModal('profile')} className="p-2 text-slate-400 hover:text-slate-700 transition-colors" title="Settings">
+             <button onClick={() => setActiveModal('profile')} className="p-2 text-slate-400 hover:text-slate-700 transition-colors hover:rotate-90 active:scale-90 duration-500" title="Settings">
                  <Settings size={18} />
              </button>
-             <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Logout"><LogOut size={18} /></button>
+             <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:scale-110 active:scale-90" title="Logout"><LogOut size={18} /></button>
            </div>
         ) : (
           <div className="flex items-center gap-1 pl-1 pr-1">
-             <button onClick={() => handleAuthClick('signin')} className="px-5 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-purple-600 transition-all hover:bg-white/50">Sign In</button>
-             <button onClick={() => handleAuthClick('signup')} className="px-6 py-2.5 rounded-full text-sm font-bold bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 transition-all shadow-lg shadow-purple-500/20">Sign Up</button>
+             <button onClick={() => handleAuthClick('signin')} className="px-5 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-purple-600 transition-all hover:bg-white/50 active:scale-95">Sign In</button>
+             <button onClick={() => handleAuthClick('signup')} className="px-6 py-2.5 rounded-full text-sm font-bold bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 transition-all shadow-lg shadow-purple-500/20 active:scale-95 hover:-translate-y-0.5">Sign Up</button>
           </div>
         )}
       </nav>
@@ -555,7 +579,7 @@ const App: React.FC = () => {
       <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
         
         {/* Story Tray (Showing active stories only) */}
-        <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0 reveal">
           <div className="flex gap-4 min-w-max">
             {/* My Story (Add) - Only visible in My Gallery */}
             {activeNav === 'My Gallery' && (
@@ -570,15 +594,15 @@ const App: React.FC = () => {
                      className="hidden" 
                      accept="image/*" 
                    />
-                   <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform">
+                   <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform duration-300">
                       <div className="absolute inset-0 rounded-full overflow-hidden opacity-60">
                         <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(currentUser?.name || 'guest').replace(/\s/g, '')}`} className="w-full h-full object-cover" />
                       </div>
-                      <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm">
+                      <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm animate-bounce">
                         <Plus size={14} strokeWidth={3}/>
                       </div>
                    </div>
-                   <span className="text-xs font-semibold text-slate-500">Your Story</span>
+                   <span className="text-xs font-semibold text-slate-500 group-hover:text-purple-600 transition-colors">Your Story</span>
                 </div>
             )}
 
@@ -587,12 +611,12 @@ const App: React.FC = () => {
                const isWatched = watchedStories.includes(story.id);
                return (
                 <div key={story.id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => handleStoryOpen(index)}>
-                   <div className={`w-20 h-20 rounded-full p-[3px] group-hover:scale-105 transition-transform duration-300 ${isWatched ? 'bg-slate-200' : 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-fuchsia-600'}`}>
+                   <div className={`w-20 h-20 rounded-full p-[3px] group-hover:scale-110 transition-transform duration-500 ${isWatched ? 'bg-slate-200' : 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-fuchsia-600 animate-[spin_10s_linear_infinite] hover:animate-none'}`}>
                       <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white relative">
                         <img src={story.imageUrl} className="w-full h-full object-cover" />
                       </div>
                    </div>
-                   <span className="text-xs font-semibold text-slate-600 max-w-[80px] truncate">{story.author.split(' ')[0]}</span>
+                   <span className="text-xs font-semibold text-slate-600 max-w-[80px] truncate group-hover:text-slate-900 transition-colors">{story.author.split(' ')[0]}</span>
                 </div>
                );
             })}
@@ -600,9 +624,9 @@ const App: React.FC = () => {
         </div>
 
         {/* Leaderboard Ad */}
-        <div className="w-full flex justify-center mb-16">
+        <div className="w-full flex justify-center mb-16 reveal">
           <GoogleAd 
-            className="w-full max-w-[970px] h-[90px] md:h-[250px] shadow-sm" 
+            className="w-full max-w-[970px] h-[90px] md:h-[250px] shadow-sm hover:shadow-lg transition-shadow duration-500" 
             slot="1234567890" 
             format="horizontal" 
           />
@@ -611,7 +635,7 @@ const App: React.FC = () => {
         {/* Main Content Area */}
         <div className="w-full">
             <div className="mb-10">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 reveal">
                 <div>
                     <h2 className="text-5xl font-black text-slate-900 mb-3 tracking-tight">
                     {activeNav === 'My Gallery' ? 'My Collections' : 'Community Feed'}
@@ -622,27 +646,28 @@ const App: React.FC = () => {
                 </div>
                 {/* View Toggle */}
                 {activeNav !== 'Stories' && (
-                    <div className="flex bg-white/50 backdrop-blur-md rounded-2xl p-1 border border-white shadow-sm">
-                        <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><Grid size={20}/></button>
-                        <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><List size={20}/></button>
+                    <div className="flex bg-white/50 backdrop-blur-md rounded-2xl p-1 border border-white shadow-sm hover:shadow-md transition-shadow">
+                        <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all active:scale-95 ${viewMode === 'grid' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><Grid size={20}/></button>
+                        <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all active:scale-95 ${viewMode === 'list' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><List size={20}/></button>
                     </div>
                 )}
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-6 reveal">
                 <SearchBar value={searchQuery} onChange={setSearchQuery} />
                 
                 {/* Categories Filter Bar */}
                 {activeNav !== 'Stories' && (
                     <div className="flex overflow-x-auto pb-4 gap-3 no-scrollbar items-center">
-                        {['All', 'Photography', 'Art', 'Design', 'Tech', 'Lifestyle'].map(cat => (
+                        {['All', 'Photography', 'Art', 'Design', 'Tech', 'Lifestyle'].map((cat, idx) => (
                             <button 
                                 key={cat}
                                 onClick={() => setActiveCategory(cat)}
-                                className={`px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${
+                                style={{ animationDelay: `${idx * 100}ms` }}
+                                className={`animate-fade-up opacity-0 px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border active:scale-95 ${
                                     activeCategory === cat 
-                                    ? 'bg-slate-900 text-white border-slate-900' 
-                                    : 'bg-white/40 border-slate-200 text-slate-600 hover:bg-white hover:border-purple-300 hover:text-purple-600'
+                                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105' 
+                                    : 'bg-white/40 border-slate-200 text-slate-600 hover:bg-white hover:border-purple-300 hover:text-purple-600 hover:shadow-md'
                                 }`}
                             >
                                 {cat}
@@ -654,7 +679,9 @@ const App: React.FC = () => {
             </div>
 
             {/* In-feed Ad */}
-            <GoogleAd className="w-full h-[120px] mb-12 shadow-sm" slot="0987654321" format="horizontal" />
+            <div className="reveal">
+              <GoogleAd className="w-full h-[120px] mb-12 shadow-sm" slot="0987654321" format="horizontal" />
+            </div>
 
             <MediaGallery 
                 items={displayedItems}
@@ -678,16 +705,16 @@ const App: React.FC = () => {
       </main>
 
       {/* Footer Ad */}
-      <div className="max-w-[1200px] mx-auto px-4 mb-8">
+      <div className="max-w-[1200px] mx-auto px-4 mb-8 reveal">
         <GoogleAd className="w-full h-[200px]" slot="5555555555" format="auto" />
       </div>
 
-      <footer className="bg-white/50 backdrop-blur-lg border-t border-slate-200 py-20">
+      <footer className="bg-white/50 backdrop-blur-lg border-t border-slate-200 py-20 reveal">
         <div className="max-w-7xl mx-auto px-6 text-center">
-             <h2 className="text-4xl font-black mb-6 gradient-text">{headerConfig.title}</h2>
+             <h2 className="text-4xl font-black mb-6 gradient-text hover:scale-105 transition-transform duration-500 cursor-default inline-block">{headerConfig.title}</h2>
              <div className="flex justify-center gap-6 mb-8">
                 {['About', 'Privacy', 'Contact', 'Terms'].map(item => (
-                    <a key={item} href="#" className="text-slate-500 font-bold hover:text-purple-600 transition-colors">{item}</a>
+                    <a key={item} href="#" className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">{item}</a>
                 ))}
              </div>
              <p className="text-slate-400 text-sm font-medium">© 2025 Creative Space Studio. All rights reserved.</p>
@@ -733,7 +760,7 @@ const App: React.FC = () => {
       {/* Story Upload Modal */}
       {showStoryUploadModal && tempStoryImg && (
         <div className="fixed inset-0 z-[2000] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-           <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+           <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
               <div className="p-6">
                  <h3 className="text-2xl font-black text-slate-900 mb-6">New Story</h3>
                  <div className="aspect-[9/16] w-32 rounded-xl overflow-hidden shadow-lg mx-auto mb-6 bg-slate-100 border border-slate-200">
@@ -746,7 +773,7 @@ const App: React.FC = () => {
                         <input 
                            value={newStoryTitle}
                            onChange={e => setNewStoryTitle(e.target.value)}
-                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold"
+                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold transition-all focus:ring-4 focus:ring-purple-500/10"
                            placeholder="Add a caption..."
                            autoFocus
                         />
@@ -758,7 +785,7 @@ const App: React.FC = () => {
                             <input 
                                value={newStoryLink}
                                onChange={e => setNewStoryLink(e.target.value)}
-                               className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-medium text-sm"
+                               className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-medium text-sm transition-all focus:ring-4 focus:ring-purple-500/10"
                                placeholder="https://..."
                             />
                         </div>
@@ -766,8 +793,8 @@ const App: React.FC = () => {
                  </div>
 
                  <div className="flex gap-3 mt-8">
-                     <button onClick={finalizeStoryUpload} className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-purple-200"><Check size={18}/> Post Story</button>
-                     <button onClick={() => {setShowStoryUploadModal(false); setTempStoryImg(null);}} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"><X size={18}/> Cancel</button>
+                     <button onClick={finalizeStoryUpload} className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-purple-200 active:scale-95"><Check size={18}/> Post Story</button>
+                     <button onClick={() => {setShowStoryUploadModal(false); setTempStoryImg(null);}} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-95"><X size={18}/> Cancel</button>
                  </div>
               </div>
            </div>
@@ -776,19 +803,19 @@ const App: React.FC = () => {
 
       {/* Story Reader Modal (Long Form) */}
       {activeStory && (
-        <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-in slide-in-from-bottom-10">
+        <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-in slide-in-from-bottom-10 duration-500">
            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex justify-between items-center z-10">
-              <button onClick={() => setActiveStory(null)} className="flex items-center gap-2 font-bold text-slate-600 hover:text-purple-600 bg-slate-50 px-4 py-2 rounded-full hover:bg-purple-50 transition-colors"><ArrowLeft size={20}/> Back</button>
-              <div className="flex gap-2"><button className="p-3 rounded-full bg-slate-50 hover:bg-pink-50 hover:text-pink-500 transition-colors"><Heart size={20}/></button></div>
+              <button onClick={() => setActiveStory(null)} className="flex items-center gap-2 font-bold text-slate-600 hover:text-purple-600 bg-slate-50 px-4 py-2 rounded-full hover:bg-purple-50 transition-colors active:scale-95"><ArrowLeft size={20}/> Back</button>
+              <div className="flex gap-2"><button className="p-3 rounded-full bg-slate-50 hover:bg-pink-50 hover:text-pink-500 transition-all hover:scale-110 active:scale-90"><Heart size={20}/></button></div>
            </div>
-           <article className="max-w-3xl mx-auto px-6 py-16">
+           <article className="max-w-3xl mx-auto px-6 py-16 animate-fade-up">
               <div className="flex gap-3 mb-6">
                 {activeStory.tags?.map(tag => (
                     <span key={tag} className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase">{tag}</span>
                 ))}
               </div>
               <h1 className="text-5xl md:text-6xl font-black text-slate-900 mb-8 leading-tight">{activeStory.title}</h1>
-              {activeStory.imageUrl && <img src={activeStory.imageUrl} className="w-full rounded-[2.5rem] shadow-2xl mb-12" />}
+              {activeStory.imageUrl && <img src={activeStory.imageUrl} className="w-full rounded-[2.5rem] shadow-2xl mb-12 hover:scale-[1.01] transition-transform duration-700" />}
               <div className="prose prose-xl prose-slate mx-auto">
                 <p className="text-2xl text-slate-600 font-medium leading-relaxed mb-8">{activeStory.excerpt}</p>
                 <div dangerouslySetInnerHTML={{ __html: activeStory.content || '' }} />

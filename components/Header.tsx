@@ -83,7 +83,7 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
       {/* Main Container */}
       <div 
         className={`
-          relative w-full max-w-[1500px] mx-auto transition-all duration-700 ease-out
+          relative w-full max-w-[1500px] mx-auto transition-all duration-1000 cubic-bezier(0.16, 1, 0.3, 1)
           ${config.photoUrl 
             ? 'h-[500px] md:h-[650px] rounded-[3rem] shadow-2xl shadow-slate-900/20 overflow-hidden ring-1 ring-black/5' 
             : 'h-auto min-h-[400px] flex flex-col items-center justify-center'
@@ -98,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
                <img 
                  src={config.photoUrl} 
                  alt="Cover" 
-                 className="w-full h-full object-cover transform scale-100 group-hover:scale-105 transition-transform duration-[3s] ease-out will-change-transform opacity-90"
+                 className="w-full h-full object-cover transform scale-100 group-hover:scale-105 transition-transform duration-[4s] ease-out will-change-transform opacity-90 animate-fade-in"
                />
                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent/20 opacity-90"></div>
                <div className="absolute inset-0 bg-black/20"></div>
@@ -124,16 +124,16 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
                         placeholder="Description"
                       />
                       <div className="flex gap-4 mt-6 justify-center">
-                        <button onClick={saveEditing} className="px-8 py-3 bg-purple-600 text-white rounded-full font-bold flex items-center gap-2 hover:bg-purple-700 transition-all shadow-lg"><Check size={18} /> Save</button>
-                        <button onClick={cancelEditing} className="px-8 py-3 bg-white/10 text-white rounded-full font-bold hover:bg-white/20 transition-all backdrop-blur-md"><X size={18} /> Cancel</button>
+                        <button onClick={saveEditing} className="px-8 py-3 bg-purple-600 text-white rounded-full font-bold flex items-center gap-2 hover:bg-purple-700 transition-all shadow-lg active:scale-95"><Check size={18} /> Save</button>
+                        <button onClick={cancelEditing} className="px-8 py-3 bg-white/10 text-white rounded-full font-bold hover:bg-white/20 transition-all backdrop-blur-md active:scale-95"><X size={18} /> Cancel</button>
                       </div>
                   </div>
                ) : (
                  <div className="pointer-events-auto">
-                   <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 tracking-tight drop-shadow-2xl leading-[0.9]">
+                   <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 tracking-tight drop-shadow-2xl leading-[0.9] animate-fade-up">
                      {config.title}
                    </h1>
-                   <p className="text-lg md:text-2xl text-slate-200 font-medium leading-relaxed max-w-3xl drop-shadow-lg mx-auto">
+                   <p className="text-lg md:text-2xl text-slate-200 font-medium leading-relaxed max-w-3xl drop-shadow-lg mx-auto animate-fade-up" style={{animationDelay: '0.2s'}}>
                      {config.description}
                    </p>
                  </div>
@@ -142,22 +142,22 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
 
             {/* Floating Controls (Visible on Hover) - Hidden while editing */}
             {!isEditing && (
-              <div className="absolute top-6 right-6 flex flex-wrap justify-end gap-3 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all duration-300 z-[50] translate-y-0 md:translate-y-[-10px] md:group-hover:translate-y-0">
+              <div className="absolute top-6 right-6 flex flex-wrap justify-end gap-3 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all duration-500 z-[50] translate-y-0 md:translate-y-[-10px] md:group-hover:translate-y-0">
                  <button 
                    onClick={startEditing} 
-                   className="px-5 py-3 bg-white/10 backdrop-blur-xl border border-white/20 text-white rounded-full font-bold text-xs md:text-sm hover:bg-white hover:text-slate-900 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                   className="px-5 py-3 bg-white/10 backdrop-blur-xl border border-white/20 text-white rounded-full font-bold text-xs md:text-sm hover:bg-white hover:text-slate-900 transition-all flex items-center gap-2 shadow-lg cursor-pointer hover:scale-105 active:scale-95"
                  >
                    <Edit2 size={16} /> <span>Edit Text</span>
                  </button>
                  <button 
                    onClick={triggerFileUpload} 
-                   className="px-5 py-3 bg-white/10 backdrop-blur-xl border border-white/20 text-white rounded-full font-bold text-xs md:text-sm hover:bg-white hover:text-slate-900 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                   className="px-5 py-3 bg-white/10 backdrop-blur-xl border border-white/20 text-white rounded-full font-bold text-xs md:text-sm hover:bg-white hover:text-slate-900 transition-all flex items-center gap-2 shadow-lg cursor-pointer hover:scale-105 active:scale-95"
                  >
                    <ImageIcon size={16} /> <span>Change Cover</span>
                  </button>
                  <button 
                    onClick={handleRemovePhoto} 
-                   className={`p-3 backdrop-blur-xl border border-white/20 text-white rounded-full transition-all shadow-lg cursor-pointer flex items-center gap-2 ${isDeleteConfirming ? 'bg-red-600 hover:bg-red-700 w-auto px-4' : 'bg-red-500/80 hover:bg-red-600'}`}
+                   className={`p-3 backdrop-blur-xl border border-white/20 text-white rounded-full transition-all shadow-lg cursor-pointer flex items-center gap-2 hover:scale-105 active:scale-95 ${isDeleteConfirming ? 'bg-red-600 hover:bg-red-700 w-auto px-4' : 'bg-red-500/80 hover:bg-red-600'}`}
                    title="Remove Cover"
                  >
                    <Trash2 size={18} />
@@ -199,15 +199,15 @@ const Header: React.FC<HeaderProps> = ({ config, onUpdatePhoto, onUpdateInfo, on
                     <Sparkles size={40} className="text-purple-600" strokeWidth={1.5} />
                   </div>
 
-                  <h1 className="text-7xl md:text-9xl font-black mb-8 tracking-tighter leading-[0.9] text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-indigo-600 pb-2 drop-shadow-sm select-none">
+                  <h1 className="text-7xl md:text-9xl font-black mb-8 tracking-tighter leading-[0.9] text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-500 to-indigo-600 pb-2 drop-shadow-sm select-none animate-fade-up">
                     {config.title}
                   </h1>
                   
-                  <p className="text-xl md:text-3xl text-slate-500 max-w-3xl mx-auto mb-16 font-medium leading-relaxed">
+                  <p className="text-xl md:text-3xl text-slate-500 max-w-3xl mx-auto mb-16 font-medium leading-relaxed animate-fade-up" style={{animationDelay: '0.2s'}}>
                     {config.description}
                   </p>
                   
-                  <div className="flex flex-wrap justify-center gap-5">
+                  <div className="flex flex-wrap justify-center gap-5 animate-fade-up" style={{animationDelay: '0.4s'}}>
                     <button
                       onClick={startEditing}
                       className="group px-10 py-4 bg-white border border-white text-slate-600 hover:text-purple-600 hover:border-purple-100 rounded-full font-bold flex items-center gap-3 transition-all shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:-translate-y-1 active:scale-95 active:translate-y-0"

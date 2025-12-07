@@ -19,6 +19,31 @@
               primary: '#7c3aed',
               secondary: '#db2777',
               accent: '#06b6d4',
+            },
+            animation: {
+              'fade-up': 'fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'scale-up': 'scaleUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'shimmer': 'shimmer 2s linear infinite',
+              'blob': 'aurora-move 20s infinite alternate',
+            },
+            keyframes: {
+              fadeUp: {
+                '0%': { opacity: '0', transform: 'translateY(40px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              scaleUp: {
+                '0%': { opacity: '0', transform: 'scale(0.9)' },
+                '100%': { opacity: '1', transform: 'scale(1)' },
+              },
+              shimmer: {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(100%)' },
+              }
             }
           }
         }
@@ -33,6 +58,10 @@
         --color-accent: #06b6d4; /* Cyan */
       }
       
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         font-family: var(--font-sans);
         background-color: #f8fafc;
@@ -149,6 +178,17 @@
       
       .animate-slide-in {
         animation: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      /* Scroll Reveal Helper Classes */
+      .reveal {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .reveal.active {
+        opacity: 1;
+        transform: translateY(0);
       }
       
       .no-scrollbar::-webkit-scrollbar { display: none; }

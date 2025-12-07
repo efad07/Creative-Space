@@ -136,17 +136,17 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 
         {/* Toolbar */}
         {allowUpload && items.length > 0 && (
-          <div className="mb-8 glass-panel rounded-[2rem] p-4 flex flex-wrap gap-4 items-center justify-between animate-in fade-in slide-in-from-bottom-4 shadow-sm">
+          <div className="mb-8 glass-panel rounded-[2rem] p-4 flex flex-wrap gap-4 items-center justify-between animate-fade-up shadow-sm">
             <div className="flex items-center gap-3 pl-2">
               <div className="p-2 bg-slate-100 rounded-full text-slate-500"><Layers size={18} /></div>
               <h3 className="font-bold text-lg text-slate-800">Manage Gallery</h3>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => imageInputRef.current?.click()} className="px-5 py-2.5 bg-slate-900 text-white rounded-full font-bold text-xs flex gap-2 items-center hover:bg-slate-800 transition-all hover:-translate-y-0.5 shadow-lg shadow-slate-200"><ImageIcon size={14}/> Photos</button>
-              <button onClick={() => videoInputRef.current?.click()} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-full font-bold text-xs flex gap-2 items-center hover:bg-slate-50 transition-all hover:-translate-y-0.5"><Film size={14}/> Video</button>
+              <button onClick={() => imageInputRef.current?.click()} className="px-5 py-2.5 bg-slate-900 text-white rounded-full font-bold text-xs flex gap-2 items-center hover:bg-slate-800 transition-all hover:-translate-y-0.5 shadow-lg shadow-slate-200 active:scale-95"><ImageIcon size={14}/> Photos</button>
+              <button onClick={() => videoInputRef.current?.click()} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-full font-bold text-xs flex gap-2 items-center hover:bg-slate-50 transition-all hover:-translate-y-0.5 active:scale-95"><Film size={14}/> Video</button>
               <button 
                 onClick={handleClearClick} 
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ml-2 text-xs font-bold ${isClearingConfirm ? 'bg-red-600 text-white shadow-lg shadow-red-200' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-full transition-all ml-2 text-xs font-bold active:scale-95 ${isClearingConfirm ? 'bg-red-600 text-white shadow-lg shadow-red-200' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
               >
                  {isClearingConfirm ? <><Check size={16}/> Confirm</> : <Trash2 size={18}/>}
               </button>
@@ -157,7 +157,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
         {items.length === 0 ? (
           allowUpload ? (
               <div 
-                  className="w-full h-[400px] border-3 border-dashed border-slate-200 hover:border-purple-400 rounded-[2.5rem] flex flex-col items-center justify-center text-center hover:bg-purple-50/10 transition-all cursor-pointer group bg-white/40 backdrop-blur-sm"
+                  className="w-full h-[400px] border-3 border-dashed border-slate-200 hover:border-purple-400 rounded-[2.5rem] flex flex-col items-center justify-center text-center hover:bg-purple-50/10 transition-all cursor-pointer group bg-white/40 backdrop-blur-sm animate-fade-up"
                   onClick={() => imageInputRef.current?.click()}
               >
                   <div className="w-24 h-24 bg-white rounded-full shadow-2xl flex items-center justify-center text-purple-600 mb-6 group-hover:scale-110 transition-transform duration-300 group-hover:text-purple-500 group-hover:shadow-purple-200">
@@ -169,7 +169,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                   </p>
               </div>
           ) : (
-              <div className="text-center py-32 opacity-60">
+              <div className="text-center py-32 opacity-60 animate-fade-in">
                 <div className="w-24 h-24 bg-slate-100/50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300"><ImageIcon size={48}/></div>
                 <h3 className="text-2xl font-bold text-slate-900">No items found</h3>
                 <p className="text-slate-500 mt-2">Adjust your filters or search terms.</p>
@@ -180,7 +180,8 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
           <div className={viewMode === 'grid' ? "columns-1 sm:columns-2 lg:columns-3 gap-8 space-y-8" : "flex flex-col gap-6"}>
               {items.map((item, idx) => (
                 <div key={item.id} 
-                      className={`break-inside-avoid relative group rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 cursor-pointer border border-white/50 ${viewMode === 'list' ? 'flex h-64 hover:-translate-y-1' : 'hover:-translate-y-2'}`}
+                      className={`break-inside-avoid relative group rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 cursor-pointer border border-white/50 opacity-0 animate-fade-up ${viewMode === 'list' ? 'flex h-64 hover:-translate-y-1' : 'hover:-translate-y-2 hover:rotate-1'}`}
+                      style={{ animationDelay: `${idx * 100}ms` }}
                       onClick={() => onOpenLightbox(idx)}
                 >
                     {/* Media Display */}
@@ -189,13 +190,13 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                         <img 
                           src={item.url} 
                           alt={item.name} 
-                          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                          className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000 ease-out"
                         />
                       ) : (
-                        <div className="w-full h-full bg-slate-900 flex items-center justify-center group-hover:scale-105 transition-transform duration-700">
+                        <div className="w-full h-full bg-slate-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-1000 ease-out">
                           <video src={item.url} className="w-full h-full object-cover opacity-80" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                           <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/50">
+                              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/50 animate-pulse">
                                   <Film size={20} />
                               </div>
                           </div>
@@ -204,7 +205,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                       
                       {/* Grid View Overlay with Author Info */}
                       {viewMode === 'grid' && (
-                          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex flex-col justify-end h-full">
+                          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) flex flex-col justify-end h-full">
                                <div className="flex items-center gap-2 mb-3">
                                    <div className="w-8 h-8 rounded-full border border-white/50 overflow-hidden bg-white/20 backdrop-blur-sm shrink-0">
                                        {item.authorAvatar ? (
@@ -223,7 +224,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                       {item.category && <span className="text-[10px] font-bold text-white/80 bg-white/10 px-2 py-1 rounded-md backdrop-blur-sm mb-2 inline-block">{item.category}</span>}
                                       <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md truncate w-48">{item.title || item.name}</h3>
                                   </div>
-                                  <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`p-2 rounded-full backdrop-blur-md transition-all ${item.likedByUser ? 'bg-pink-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                                  <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`p-2 rounded-full backdrop-blur-md transition-all active:scale-75 duration-300 ${item.likedByUser ? 'bg-pink-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
                                       <Heart size={18} fill={item.likedByUser ? "currentColor" : "none"} />
                                   </button>
                                </div>
@@ -251,12 +252,12 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                 </div>
                                 <div className="flex gap-2">
                                    {allowUpload && (
-                                      <button onClick={(e) => startEditing(e, item)} className="p-2 text-slate-400 hover:text-purple-600 transition-colors"><Edit2 size={18} /></button>
+                                      <button onClick={(e) => startEditing(e, item)} className="p-2 text-slate-400 hover:text-purple-600 transition-colors hover:rotate-12"><Edit2 size={18} /></button>
                                    )}
                                    {allowUpload && (
                                        <button 
                                           onClick={(e) => handleDeleteClick(e, item.id)} 
-                                          className={`p-2 transition-all rounded-full ${deleteConfirmId === item.id ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-red-500'}`}
+                                          className={`p-2 transition-all rounded-full active:scale-90 ${deleteConfirmId === item.id ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-red-500'}`}
                                         >
                                           {deleteConfirmId === item.id ? <Check size={18} /> : <Trash2 size={18}/>}
                                         </button>
@@ -265,11 +266,11 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                             </div>
                             
                             <div className="mt-auto flex items-center gap-6">
-                                <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`flex items-center gap-2 font-bold transition-colors ${item.likedByUser ? 'text-pink-500' : 'text-slate-400 hover:text-slate-600'}`}>
+                                <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`flex items-center gap-2 font-bold transition-all active:scale-90 ${item.likedByUser ? 'text-pink-500' : 'text-slate-400 hover:text-slate-600'}`}>
                                     <Heart size={20} fill={item.likedByUser ? "currentColor" : "none"} /> {item.likes}
                                 </button>
                                 {(!currentUser || item.userId !== currentUser.email) && (
-                                    <button onClick={(e) => handleSaveClick(e, item)} className="flex items-center gap-2 font-bold text-slate-400 hover:text-purple-600 transition-colors">
+                                    <button onClick={(e) => handleSaveClick(e, item)} className="flex items-center gap-2 font-bold text-slate-400 hover:text-purple-600 transition-colors active:scale-90">
                                         {savingId === item.id ? <Loader2 size={20} className="animate-spin"/> : <Bookmark size={20} />} Save
                                     </button>
                                 )}
@@ -280,10 +281,10 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                     {/* Grid View Hover Actions (Edit/Delete) */}
                     {viewMode === 'grid' && allowUpload && (
                         <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                             <button onClick={(e) => startEditing(e, item)} className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-purple-600 shadow-sm"><Edit2 size={14}/></button>
+                             <button onClick={(e) => startEditing(e, item)} className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-purple-600 shadow-sm hover:scale-110 active:scale-90 transition-transform"><Edit2 size={14}/></button>
                              <button 
                                 onClick={(e) => handleDeleteClick(e, item.id)} 
-                                className={`p-2 backdrop-blur-md rounded-full shadow-sm transition-all ${deleteConfirmId === item.id ? 'bg-red-600 text-white' : 'bg-white/90 text-slate-600 hover:text-red-600'}`}
+                                className={`p-2 backdrop-blur-md rounded-full shadow-sm transition-all hover:scale-110 active:scale-90 ${deleteConfirmId === item.id ? 'bg-red-600 text-white' : 'bg-white/90 text-slate-600 hover:text-red-600'}`}
                              >
                                {deleteConfirmId === item.id ? <Check size={14}/> : <Trash2 size={14}/>}
                              </button>
@@ -294,7 +295,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                     {viewMode === 'grid' && (!currentUser || item.userId !== currentUser.email) && (
                        <button 
                           onClick={(e) => handleSaveClick(e, item)}
-                          className="absolute top-3 right-3 p-2.5 bg-white/20 backdrop-blur-md border border-white/30 rounded-full text-white hover:bg-white hover:text-purple-600 transition-all opacity-0 group-hover:opacity-100 duration-300"
+                          className="absolute top-3 right-3 p-2.5 bg-white/20 backdrop-blur-md border border-white/30 rounded-full text-white hover:bg-white hover:text-purple-600 transition-all opacity-0 group-hover:opacity-100 duration-300 hover:scale-110 active:scale-90"
                         >
                           {savingId === item.id ? <Loader2 size={16} className="animate-spin"/> : <Bookmark size={16} />}
                        </button>
@@ -308,7 +309,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
       {/* Edit Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setEditingItem(null)}>
-           <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+           <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
                <h3 className="text-2xl font-black text-slate-900 mb-6">Edit Details</h3>
                
                <div className="space-y-4">
@@ -317,7 +318,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                        <input 
                           value={editForm.title}
                           onChange={e => setEditForm(p => ({...p, title: e.target.value}))}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold focus:ring-4 focus:ring-purple-500/10 transition-all"
                        />
                    </div>
                    
@@ -326,7 +327,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                        <select 
                           value={editForm.category}
                           onChange={e => setEditForm(p => ({...p, category: e.target.value}))}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold"
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-semibold focus:ring-4 focus:ring-purple-500/10 transition-all"
                        >
                            {['Photography', 'Art', 'Design', 'Tech', 'Lifestyle'].map(c => <option key={c} value={c}>{c}</option>)}
                        </select>
@@ -340,15 +341,15 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                               value={editForm.link}
                               onChange={e => setEditForm(p => ({...p, link: e.target.value}))}
                               placeholder="https://..."
-                              className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-medium text-sm"
+                              className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-medium text-sm focus:ring-4 focus:ring-purple-500/10 transition-all"
                            />
                        </div>
                    </div>
                </div>
 
                <div className="flex gap-3 mt-8">
-                   <button onClick={saveEdit} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"><Check size={18}/> Save</button>
-                   <button onClick={() => setEditingItem(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"><X size={18}/> Cancel</button>
+                   <button onClick={saveEdit} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-purple-600 transition-colors flex items-center justify-center gap-2 active:scale-95"><Check size={18}/> Save</button>
+                   <button onClick={() => setEditingItem(null)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-95"><X size={18}/> Cancel</button>
                </div>
            </div>
         </div>
