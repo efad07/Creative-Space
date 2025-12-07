@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import MediaGallery from './components/MediaGallery';
@@ -490,7 +491,7 @@ const App: React.FC = () => {
 
           try {
              localStorage.setItem('creative_space_user', JSON.stringify(updatedUser));
-          } catch(storageError) {
+          } catch {
              throw new Error("Storage full. Image likely too large.");
           }
           setCurrentUser(updatedUser);

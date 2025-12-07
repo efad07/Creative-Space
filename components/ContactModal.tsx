@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Mail, Send, MapPin, Phone } from 'lucide-react';
+import { X, Mail, Send, MapPin } from 'lucide-react';
 
 interface ContactModalProps {
   onClose: () => void;
