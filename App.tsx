@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import MediaGallery from './components/MediaGallery';
@@ -9,6 +8,10 @@ import GoogleAd from './components/GoogleAd';
 import StoryViewer from './components/StoryViewer';
 import ProfileSettings from './components/ProfileSettings';
 import AuthModal from './components/AuthModal';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import AboutModal from './components/AboutModal';
+import ContactModal from './components/ContactModal';
+import TermsModal from './components/TermsModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData } from './types';
 import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB } from './db';
@@ -56,7 +59,7 @@ const App: React.FC = () => {
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [activeModal, setActiveModal] = useState<'auth' | 'profile' | null>(null);
+  const [activeModal, setActiveModal] = useState<'auth' | 'profile' | 'privacy' | 'about' | 'contact' | 'terms' | null>(null);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   
   // Story States
@@ -536,7 +539,7 @@ const App: React.FC = () => {
       <Toast toasts={toasts} removeToast={removeToast} />
       
       {/* Floating Navigation */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-2 py-2 flex items-center gap-1 transition-all duration-300 max-w-[95%] animate-fade-up">
+      <nav className="fixed top-6 inset-x-0 mx-auto w-fit z-[100] glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-3 py-2 flex justify-center items-center gap-1 transition-all duration-300 max-w-[95%] animate-fade-up">
         <button onClick={() => setActiveNav('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
         {currentUser && <button onClick={() => setActiveNav('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
         
@@ -713,9 +716,10 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 text-center">
              <h2 className="text-4xl font-black mb-6 gradient-text hover:scale-105 transition-transform duration-500 cursor-default inline-block">{headerConfig.title}</h2>
              <div className="flex justify-center gap-6 mb-8">
-                {['About', 'Privacy', 'Contact', 'Terms'].map(item => (
-                    <a key={item} href="#" className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">{item}</a>
-                ))}
+                <button onClick={() => setActiveModal('about')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">About</button>
+                <button onClick={() => setActiveModal('privacy')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">Privacy</button>
+                <button onClick={() => setActiveModal('contact')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">Contact</button>
+                <button onClick={() => setActiveModal('terms')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">Terms</button>
              </div>
              <p className="text-slate-400 text-sm font-medium">© 2025 Creative Space Studio. All rights reserved.</p>
         </div>
@@ -843,6 +847,16 @@ const App: React.FC = () => {
             onSave={handleUpdateProfile}
         />
       )}
+
+      {/* Privacy Policy Modal */}
+      {activeModal === 'privacy' && (
+        <PrivacyPolicy onClose={() => setActiveModal(null)} />
+      )}
+      
+      {/* New Modals */}
+      {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'contact' && <ContactModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'terms' && <TermsModal onClose={() => setActiveModal(null)} />}
     </div>
   );
 };
