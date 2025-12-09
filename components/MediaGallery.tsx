@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, Plus, Layers, Edit2, Link as LinkIcon, Check, X } from 'lucide-react';
+import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, Plus, Layers, Edit2, Link as LinkIcon, Check, X, MessageCircle, Share2 } from 'lucide-react';
 import { MediaItem, User as UserType } from '../types';
 
 interface MediaGalleryProps {
@@ -13,13 +13,15 @@ interface MediaGalleryProps {
   onToggleLike: (id: string) => void;
   onClearAll: () => void;
   onSaveItem: (item: MediaItem) => void;
+  onAddComment?: (id: string, text: string) => void;
+  onShare?: (item: MediaItem) => void;
   currentUser: UserType | null;
   allowUpload?: boolean;
   viewMode: 'grid' | 'list';
 }
 
 const MediaGallery: React.FC<MediaGalleryProps> = ({ 
-  items, onAddItems, onUpdateItem, onRemoveItem, onOpenLightbox, onShowToast, onToggleLike, onClearAll, onSaveItem, currentUser, allowUpload = false, viewMode
+  items, onAddItems, onUpdateItem, onRemoveItem, onOpenLightbox, onShowToast, onToggleLike, onClearAll, onSaveItem, onShare, currentUser, allowUpload = false, viewMode
 }) => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +53,8 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
         category: 'Photography', // Default category for uploads
         likes: 0,
         views: 0,
-        likedByUser: false
+        likedByUser: false,
+        comments: []
       });
     });
 
@@ -224,9 +227,21 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                       {item.category && <span className="text-[10px] font-bold text-white/80 bg-white/10 px-2 py-1 rounded-md backdrop-blur-sm mb-2 inline-block">{item.category}</span>}
                                       <h3 className="text-white font-bold text-lg leading-tight drop-shadow-md truncate w-48">{item.title || item.name}</h3>
                                   </div>
-                                  <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`p-2 rounded-full backdrop-blur-md transition-all active:scale-75 duration-300 ${item.likedByUser ? 'bg-pink-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
-                                      <Heart size={18} fill={item.likedByUser ? "currentColor" : "none"} />
-                                  </button>
+                                  <div className="flex gap-2">
+                                    <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`p-2 rounded-full backdrop-blur-md transition-all active:scale-75 duration-300 ${item.likedByUser ? 'bg-pink-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                                        <Heart size={18} fill={item.likedByUser ? "currentColor" : "none"} />
+                                    </button>
+                                  </div>
+                               </div>
+                               
+                               {/* Hover Stats */}
+                               <div className="flex gap-4 mt-3 pt-3 border-t border-white/10">
+                                  <div className="flex items-center gap-1.5 text-white/80 text-xs font-bold">
+                                     <Heart size={14}/> {item.likes}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-white/80 text-xs font-bold">
+                                     <MessageCircle size={14}/> {item.comments?.length || 0}
+                                  </div>
                                </div>
                           </div>
                       )}
@@ -269,8 +284,15 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                 <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`flex items-center gap-2 font-bold transition-all active:scale-90 ${item.likedByUser ? 'text-pink-500' : 'text-slate-400 hover:text-slate-600'}`}>
                                     <Heart size={20} fill={item.likedByUser ? "currentColor" : "none"} /> {item.likes}
                                 </button>
+                                <button className="flex items-center gap-2 font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                    <MessageCircle size={20} /> {item.comments?.length || 0}
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onShare && onShare(item); }} className="flex items-center gap-2 font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                    <Share2 size={20} />
+                                </button>
+
                                 {(!currentUser || item.userId !== currentUser.email) && (
-                                    <button onClick={(e) => handleSaveClick(e, item)} className="flex items-center gap-2 font-bold text-slate-400 hover:text-purple-600 transition-colors active:scale-90">
+                                    <button onClick={(e) => handleSaveClick(e, item)} className="ml-auto flex items-center gap-2 font-bold text-slate-400 hover:text-purple-600 transition-colors active:scale-90">
                                         {savingId === item.id ? <Loader2 size={20} className="animate-spin"/> : <Bookmark size={20} />} Save
                                     </button>
                                 )}
@@ -278,16 +300,26 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                         </div>
                     )}
                     
-                    {/* Grid View Hover Actions (Edit/Delete) */}
-                    {viewMode === 'grid' && allowUpload && (
+                    {/* Grid View Hover Actions (Edit/Delete + Share) */}
+                    {viewMode === 'grid' && (
                         <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                             <button onClick={(e) => startEditing(e, item)} className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-purple-600 shadow-sm hover:scale-110 active:scale-90 transition-transform"><Edit2 size={14}/></button>
                              <button 
-                                onClick={(e) => handleDeleteClick(e, item.id)} 
-                                className={`p-2 backdrop-blur-md rounded-full shadow-sm transition-all hover:scale-110 active:scale-90 ${deleteConfirmId === item.id ? 'bg-red-600 text-white' : 'bg-white/90 text-slate-600 hover:text-red-600'}`}
+                                onClick={(e) => { e.stopPropagation(); onShare && onShare(item); }}
+                                className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-indigo-600 shadow-sm hover:scale-110 active:scale-90 transition-transform"
                              >
-                               {deleteConfirmId === item.id ? <Check size={14}/> : <Trash2 size={14}/>}
+                                <Share2 size={14} />
                              </button>
+                             {allowUpload && (
+                                <>
+                                 <button onClick={(e) => startEditing(e, item)} className="p-2 bg-white/90 backdrop-blur-md rounded-full text-slate-600 hover:text-purple-600 shadow-sm hover:scale-110 active:scale-90 transition-transform"><Edit2 size={14}/></button>
+                                 <button 
+                                    onClick={(e) => handleDeleteClick(e, item.id)} 
+                                    className={`p-2 backdrop-blur-md rounded-full shadow-sm transition-all hover:scale-110 active:scale-90 ${deleteConfirmId === item.id ? 'bg-red-600 text-white' : 'bg-white/90 text-slate-600 hover:text-red-600'}`}
+                                 >
+                                   {deleteConfirmId === item.id ? <Check size={14}/> : <Trash2 size={14}/>}
+                                 </button>
+                                </>
+                             )}
                         </div>
                     )}
                     
@@ -295,7 +327,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                     {viewMode === 'grid' && (!currentUser || item.userId !== currentUser.email) && (
                        <button 
                           onClick={(e) => handleSaveClick(e, item)}
-                          className="absolute top-3 right-3 p-2.5 bg-white/20 backdrop-blur-md border border-white/30 rounded-full text-white hover:bg-white hover:text-purple-600 transition-all opacity-0 group-hover:opacity-100 duration-300 hover:scale-110 active:scale-90"
+                          className="absolute top-3 left-3 p-2.5 bg-black/20 backdrop-blur-md border border-white/30 rounded-full text-white hover:bg-white hover:text-purple-600 transition-all opacity-0 group-hover:opacity-100 duration-300 hover:scale-110 active:scale-90"
                         >
                           {savingId === item.id ? <Loader2 size={16} className="animate-spin"/> : <Bookmark size={16} />}
                        </button>

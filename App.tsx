@@ -13,8 +13,9 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import AboutModal from './components/AboutModal';
 import ContactModal from './components/ContactModal';
 import TermsModal from './components/TermsModal';
-import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData } from './types';
-import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon } from 'lucide-react';
+import UserSearchModal from './components/UserSearchModal';
+import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData, Comment } from './types';
+import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
 
 // Sample Data for Blog with Timestamps for Expiration Logic
@@ -61,7 +62,7 @@ const App: React.FC = () => {
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [activeModal, setActiveModal] = useState<'auth' | 'profile' | 'privacy' | 'about' | 'contact' | 'terms' | null>(null);
+  const [activeModal, setActiveModal] = useState<'auth' | 'profile' | 'privacy' | 'about' | 'contact' | 'terms' | 'userSearch' | null>(null);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   
   // Story States
@@ -234,7 +235,8 @@ const App: React.FC = () => {
       ...item,
       userId: authorInfo.email,
       authorName: authorInfo.name,
-      authorAvatar: authorInfo.avatar
+      authorAvatar: authorInfo.avatar,
+      comments: []
     }));
     
     setMediaItems((prev) => [...prev, ...itemsWithUser]);
@@ -317,6 +319,7 @@ const App: React.FC = () => {
         likes: 0, 
         views: 0, 
         likedByUser: false, 
+        comments: [],
         blob 
     };
 
@@ -351,6 +354,51 @@ const App: React.FC = () => {
         }
         return item;
     }));
+  };
+
+  // --- Comment & Share Handlers ---
+  const handleAddComment = (itemId: string, text: string) => {
+    if (!currentUser) {
+        showToast('Please sign in to comment', 'error');
+        setAuthMode('signin');
+        setActiveModal('auth');
+        return;
+    }
+    const newComment: Comment = {
+        id: Math.random().toString(36).substr(2, 9),
+        text,
+        userId: currentUser.email,
+        userName: currentUser.name,
+        userAvatar: currentUser.avatar,
+        timestamp: Date.now()
+    };
+
+    setMediaItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+            const updated = { ...item, comments: [...(item.comments || []), newComment] };
+            saveMediaItemToDB(updated);
+            return updated;
+        }
+        return item;
+    }));
+    showToast('Comment added', 'success');
+  };
+
+  const handleShare = async (item: MediaItem) => {
+      if (navigator.share) {
+          try {
+              await navigator.share({
+                  title: item.title || 'Check this out!',
+                  text: `Check out this amazing content by ${item.authorName} on Creative Space.`,
+                  url: window.location.href
+              });
+          } catch (error) {
+              console.log('Error sharing', error);
+          }
+      } else {
+           navigator.clipboard.writeText(window.location.href);
+           showToast('Link copied to clipboard', 'success');
+      }
   };
 
   const handleStoryOpen = (index: number) => {
@@ -599,6 +647,10 @@ const App: React.FC = () => {
         <button onClick={() => handleNavChange('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' && !selectedUserProfile ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
         {currentUser && <button onClick={() => handleNavChange('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' && !selectedUserProfile ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
         
+        <button onClick={() => setActiveModal('userSearch')} className="px-4 py-2.5 rounded-full text-sm font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all flex items-center gap-2 active:scale-95">
+          <Users size={16}/> <span className="hidden sm:inline">Creators</span>
+        </button>
+
         {/* Added Policy Links to Nav for AdSense Compliance */}
         <div className="hidden lg:flex items-center gap-1 mx-2">
             <button onClick={() => setActiveModal('about')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">About</button>
@@ -829,6 +881,8 @@ const App: React.FC = () => {
                 onToggleLike={toggleLike}
                 onClearAll={clearAllMedia}
                 onSaveItem={handleSaveItem}
+                onAddComment={handleAddComment}
+                onShare={handleShare}
                 currentUser={currentUser}
                 allowUpload={selectedUserProfile ? (currentUser?.email === selectedUserProfile.email) : (activeNav === 'My Gallery')}
                 viewMode={viewMode}
@@ -951,6 +1005,8 @@ const App: React.FC = () => {
             if (item) incrementView(item.id);
         }}
         onToggleLike={toggleLike}
+        onAddComment={handleAddComment}
+        onShare={handleShare}
       />
       
       {/* Immersive Story Viewer */}
@@ -1065,6 +1121,15 @@ const App: React.FC = () => {
       {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
       {activeModal === 'contact' && <ContactModal onClose={() => setActiveModal(null)} />}
       {activeModal === 'terms' && <TermsModal onClose={() => setActiveModal(null)} />}
+      
+      {/* User Search Modal */}
+      {activeModal === 'userSearch' && (
+        <UserSearchModal 
+            users={allUsers}
+            onClose={() => setActiveModal(null)}
+            onSelect={handleUserSelect}
+        />
+      )}
     </div>
   );
 };

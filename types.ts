@@ -1,4 +1,13 @@
 
+export interface Comment {
+  id: string;
+  text: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  timestamp: number;
+}
+
 export interface MediaItem {
   id: string;
   type: 'image' | 'video';
@@ -11,6 +20,7 @@ export interface MediaItem {
   likes: number;
   views: number;
   likedByUser: boolean;
+  comments?: Comment[];
   // Author info
   userId?: string;
   authorName?: string;
