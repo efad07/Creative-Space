@@ -14,8 +14,8 @@ import AboutModal from './components/AboutModal';
 import ContactModal from './components/ContactModal';
 import TermsModal from './components/TermsModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData } from './types';
-import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook } from 'lucide-react';
-import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB } from './db';
+import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon } from 'lucide-react';
+import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
 
 // Sample Data for Blog with Timestamps for Expiration Logic
 const INITIAL_STORIES: BlogPostData[] = [
@@ -54,6 +54,7 @@ const App: React.FC = () => {
   });
 
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // User Database for Search
   const [lightboxState, setLightboxState] = useState<{ isOpen: boolean; index: number }>({
     isOpen: false,
     index: 0
@@ -83,6 +84,9 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // User Profile Viewing State
+  const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
 
@@ -113,7 +117,7 @@ const App: React.FC = () => {
     }, 500);
 
     return () => observer.disconnect();
-  }, [mediaItems, activeNav, viewMode, activeCategory]);
+  }, [mediaItems, activeNav, viewMode, activeCategory, selectedUserProfile]);
 
   // --- Initialization ---
   useEffect(() => {
@@ -135,6 +139,10 @@ const App: React.FC = () => {
         });
 
         setMediaItems(savedMedia);
+
+        // Load all users for search
+        const users = await getAllUsers();
+        setAllUsers(users);
         
         // Load watched stories
         const savedWatched = localStorage.getItem('creative_space_watched_stories');
@@ -160,6 +168,14 @@ const App: React.FC = () => {
         objectUrlsRef.current = [];
     };
   }, []);
+
+  // Sync users when registered
+  const refreshUsers = async () => {
+      try {
+          const users = await getAllUsers();
+          setAllUsers(users);
+      } catch (e) { console.error(e); }
+  }
 
   // Helper to persist stories
   const saveStoriesToLocal = (newStories: BlogPostData[]) => {
@@ -416,13 +432,41 @@ const App: React.FC = () => {
 
   const getDisplayedItems = () => {
     let items = mediaItems;
-    if (activeNav === 'My Gallery' && currentUser) items = items.filter(item => item.userId === currentUser.email);
+
+    if (selectedUserProfile) {
+        // If viewing a user profile, filter strictly by that user
+        items = items.filter(item => item.userId === selectedUserProfile.email);
+        // Also apply search query within that profile
+        if (searchQuery) items = items.filter(item => (item.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()));
+    } else {
+        // Default Logic
+        if (activeNav === 'My Gallery' && currentUser) items = items.filter(item => item.userId === currentUser.email);
+        
+        // Search Filter (for global feed)
+        // If searching users, the SearchBar dropdown handles navigation, but we also filter posts by title/author text
+        if (searchQuery) {
+            items = items.filter(item => (item.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+    }
+    
+    // Category is always applied
     if (activeCategory !== 'All') items = items.filter(item => item.category === activeCategory);
-    if (searchQuery) items = items.filter(item => (item.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
     return items;
   };
 
   const displayedItems = getDisplayedItems();
+
+  // Search logic for Users
+  const matchedUsers = searchQuery 
+    ? allUsers.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+
+  const handleUserSelect = (user: User) => {
+      setSelectedUserProfile(user);
+      setSearchQuery(''); // Clear search to show full profile
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   
   // Auth Handlers
   const handleAuthClick = (mode: 'signin' | 'signup') => {
@@ -434,6 +478,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     localStorage.removeItem('creative_space_user');
     setActiveNav('All');
+    setSelectedUserProfile(null);
     showToast('Logged out', 'success');
   };
 
@@ -444,6 +489,7 @@ const App: React.FC = () => {
       const user = { name: "Google User", email: "google@user.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Google" };
       try {
         await saveUserToDB(user);
+        await refreshUsers();
       } catch (e) {
         console.error("Failed to sync Google user to DB", e);
       }
@@ -467,6 +513,7 @@ const App: React.FC = () => {
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       const user = await registerUser(email, pass, name);
+      await refreshUsers();
       setCurrentUser(user);
       localStorage.setItem('creative_space_user', JSON.stringify(user));
       showToast('Account created successfully!', 'success');
@@ -495,6 +542,7 @@ const App: React.FC = () => {
              throw new Error("Storage full. Image likely too large.");
           }
           setCurrentUser(updatedUser);
+          await refreshUsers();
 
           // --- SYNC UPDATE: Update all previous posts by this user ---
           if (updates.avatar || updates.name) {
@@ -528,6 +576,13 @@ const App: React.FC = () => {
       }
   };
 
+  // Switch Main Content based on State
+  const handleNavChange = (nav: string) => {
+      setActiveNav(nav);
+      setSelectedUserProfile(null); // Clear specific user view when nav changes
+      setSearchQuery('');
+  };
+
   if (isLoading) return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 z-[9999]">
       <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4"></div>
@@ -541,8 +596,8 @@ const App: React.FC = () => {
       
       {/* Floating Navigation */}
       <nav className="fixed top-6 inset-x-0 mx-auto w-fit z-[100] glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-3 py-2 flex justify-center items-center gap-1 transition-all duration-300 max-w-[95%] animate-fade-up">
-        <button onClick={() => setActiveNav('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
-        {currentUser && <button onClick={() => setActiveNav('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
+        <button onClick={() => handleNavChange('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' && !selectedUserProfile ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
+        {currentUser && <button onClick={() => handleNavChange('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' && !selectedUserProfile ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
         
         {/* Added Policy Links to Nav for AdSense Compliance */}
         <div className="hidden lg:flex items-center gap-1 mx-2">
@@ -581,59 +636,115 @@ const App: React.FC = () => {
         )}
       </nav>
 
-      <Header 
-        config={headerConfig} 
-        onUpdatePhoto={updateHeaderPhoto}
-        onUpdateInfo={updateHeaderInfo}
-        onShowToast={showToast}
-      />
+      {/* Header - Only Show on Main Feed */}
+      {!selectedUserProfile && (
+        <Header 
+            config={headerConfig} 
+            onUpdatePhoto={updateHeaderPhoto}
+            onUpdateInfo={updateHeaderInfo}
+            onShowToast={showToast}
+        />
+      )}
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      {/* Main Container - Adjusted padding top when header is hidden */}
+      <main className={`max-w-[1400px] mx-auto px-4 md:px-8 ${selectedUserProfile ? 'pt-32 pb-12' : 'py-12'} animate-in fade-in slide-in-from-bottom-8 duration-700`}>
         
-        {/* Story Tray (Showing active stories only) */}
-        <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0 reveal">
-          <div className="flex gap-4 min-w-max">
-            {/* My Story (Add) - Only visible in My Gallery */}
-            {activeNav === 'My Gallery' && (
-                <div 
-                    className="flex flex-col items-center gap-2 cursor-pointer group" 
-                    onClick={() => storyInputRef.current?.click()}
-                >
-                   <input 
-                     type="file" 
-                     ref={storyInputRef} 
-                     onChange={handleStoryUpload} 
-                     className="hidden" 
-                     accept="image/*" 
-                   />
-                   <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform duration-300">
-                      <div className="absolute inset-0 rounded-full overflow-hidden opacity-60">
-                        <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(currentUser?.name || 'guest').replace(/\s/g, '')}`} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm animate-bounce">
-                        <Plus size={14} strokeWidth={3}/>
-                      </div>
-                   </div>
-                   <span className="text-xs font-semibold text-slate-500 group-hover:text-purple-600 transition-colors">Your Story</span>
-                </div>
-            )}
+        {/* User Profile View Header */}
+        {selectedUserProfile && (
+            <div className="mb-12 animate-fade-up">
+                 <button onClick={() => setSelectedUserProfile(null)} className="mb-8 flex items-center gap-2 px-4 py-2 bg-white rounded-full font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+                     <ArrowLeft size={18} /> Back to Feed
+                 </button>
+                 
+                 <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 md:p-12 shadow-xl flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12 relative overflow-hidden group">
+                     {/* Decorative background blur */}
+                     <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
-            {/* Other Stories */}
-            {activeStories.map((story, index) => {
-               const isWatched = watchedStories.includes(story.id);
-               return (
-                <div key={story.id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => handleStoryOpen(index)}>
-                   <div className={`w-20 h-20 rounded-full p-[3px] group-hover:scale-110 transition-transform duration-500 ${isWatched ? 'bg-slate-200' : 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-fuchsia-600 animate-[spin_10s_linear_infinite] hover:animate-none'}`}>
-                      <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white relative">
-                        <img src={story.imageUrl} className="w-full h-full object-cover" />
-                      </div>
-                   </div>
-                   <span className="text-xs font-semibold text-slate-600 max-w-[80px] truncate group-hover:text-slate-900 transition-colors">{story.author.split(' ')[0]}</span>
-                </div>
-               );
-            })}
-          </div>
-        </div>
+                     <div className="w-32 h-32 md:w-40 md:h-40 rounded-full p-1 bg-gradient-to-br from-purple-500 to-pink-500 shadow-xl shrink-0">
+                         <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-white">
+                             {selectedUserProfile.avatar ? (
+                                 <img src={selectedUserProfile.avatar} alt={selectedUserProfile.name} className="w-full h-full object-cover" />
+                             ) : (
+                                 <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
+                                     <UserIcon size={48} />
+                                 </div>
+                             )}
+                         </div>
+                     </div>
+                     
+                     <div className="text-center md:text-left flex-1 min-w-0">
+                         <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-2">{selectedUserProfile.name}</h1>
+                         {selectedUserProfile.location && (
+                             <div className="flex items-center justify-center md:justify-start gap-2 text-slate-500 font-bold mb-4">
+                                 <MapPin size={16} /> {selectedUserProfile.location}
+                             </div>
+                         )}
+                         <p className="text-lg text-slate-600 font-medium leading-relaxed max-w-2xl mb-6">
+                             {selectedUserProfile.bio || "No bio yet."}
+                         </p>
+                         
+                         <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                             <div className="px-6 py-3 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center md:items-start min-w-[100px]">
+                                 <span className="text-2xl font-black text-slate-900">{mediaItems.filter(i => i.userId === selectedUserProfile.email).length}</span>
+                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Posts</span>
+                             </div>
+                             {selectedUserProfile.website && (
+                                 <a href={selectedUserProfile.website} target="_blank" rel="noreferrer" className="px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-bold flex items-center gap-2 hover:bg-indigo-100 transition-colors">
+                                     <Globe size={18} /> Website
+                                 </a>
+                             )}
+                         </div>
+                     </div>
+                 </div>
+            </div>
+        )}
+
+        {/* Story Tray (Only on main feed) */}
+        {!selectedUserProfile && (
+            <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0 reveal">
+            <div className="flex gap-4 min-w-max">
+                {/* My Story (Add) - Only visible in My Gallery */}
+                {activeNav === 'My Gallery' && (
+                    <div 
+                        className="flex flex-col items-center gap-2 cursor-pointer group" 
+                        onClick={() => storyInputRef.current?.click()}
+                    >
+                    <input 
+                        type="file" 
+                        ref={storyInputRef} 
+                        onChange={handleStoryUpload} 
+                        className="hidden" 
+                        accept="image/*" 
+                    />
+                    <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-white shadow-md flex items-center justify-center relative group-hover:scale-105 transition-transform duration-300">
+                        <div className="absolute inset-0 rounded-full overflow-hidden opacity-60">
+                            <img src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${(currentUser?.name || 'guest').replace(/\s/g, '')}`} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-sm animate-bounce">
+                            <Plus size={14} strokeWidth={3}/>
+                        </div>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-purple-600 transition-colors">Your Story</span>
+                    </div>
+                )}
+
+                {/* Other Stories */}
+                {activeStories.map((story, index) => {
+                const isWatched = watchedStories.includes(story.id);
+                return (
+                    <div key={story.id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => handleStoryOpen(index)}>
+                    <div className={`w-20 h-20 rounded-full p-[3px] group-hover:scale-110 transition-transform duration-500 ${isWatched ? 'bg-slate-200' : 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-fuchsia-600 animate-[spin_10s_linear_infinite] hover:animate-none'}`}>
+                        <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white relative">
+                            <img src={story.imageUrl} className="w-full h-full object-cover" />
+                        </div>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600 max-w-[80px] truncate group-hover:text-slate-900 transition-colors">{story.author.split(' ')[0]}</span>
+                    </div>
+                );
+                })}
+            </div>
+            </div>
+        )}
 
         {/* Leaderboard Ad */}
         <div className="w-full flex justify-center mb-16 reveal">
@@ -650,10 +761,12 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 reveal">
                 <div>
                     <h2 className="text-5xl font-black text-slate-900 mb-3 tracking-tight">
-                    {activeNav === 'My Gallery' ? 'My Collections' : 'Community Feed'}
+                    {selectedUserProfile ? 'Portfolio' : (activeNav === 'My Gallery' ? 'My Collections' : 'Community Feed')}
                     </h2>
                     <p className="text-slate-500 font-medium text-lg">
-                    {activeNav === 'My Gallery' ? 'Manage your personal uploads.' : 'Discover inspiring work from creators worldwide.'}
+                    {selectedUserProfile 
+                        ? `Explore ${selectedUserProfile.name}'s latest work.` 
+                        : (activeNav === 'My Gallery' ? 'Manage your personal uploads.' : 'Discover inspiring work from creators worldwide.')}
                     </p>
                 </div>
                 {/* View Toggle */}
@@ -666,7 +779,12 @@ const App: React.FC = () => {
             </div>
 
             <div className="space-y-6 reveal">
-                <SearchBar value={searchQuery} onChange={setSearchQuery} />
+                <SearchBar 
+                    value={searchQuery} 
+                    onChange={setSearchQuery} 
+                    matchedUsers={matchedUsers} 
+                    onSelectUser={handleUserSelect}
+                />
                 
                 {/* Categories Filter Bar */}
                 {activeNav !== 'Stories' && (
@@ -691,9 +809,11 @@ const App: React.FC = () => {
             </div>
 
             {/* In-feed Ad */}
-            <div className="reveal">
-              <GoogleAd className="w-full h-[120px] mb-12 shadow-sm" slot="0987654321" format="horizontal" />
-            </div>
+            {!selectedUserProfile && (
+                <div className="reveal">
+                    <GoogleAd className="w-full h-[120px] mb-12 shadow-sm" slot="0987654321" format="horizontal" />
+                </div>
+            )}
 
             <MediaGallery 
                 items={displayedItems}
@@ -710,31 +830,33 @@ const App: React.FC = () => {
                 onClearAll={clearAllMedia}
                 onSaveItem={handleSaveItem}
                 currentUser={currentUser}
-                allowUpload={activeNav === 'My Gallery'}
+                allowUpload={selectedUserProfile ? (currentUser?.email === selectedUserProfile.email) : (activeNav === 'My Gallery')}
                 viewMode={viewMode}
             />
         </div>
       </main>
 
       {/* SEO / Publisher Content Section for AdSense */}
-      <section className="w-full bg-white border-y border-slate-100 py-16 reveal">
-        <div className="max-w-4xl mx-auto px-6 prose prose-lg prose-slate text-slate-600">
-            <h2 className="text-3xl font-black text-slate-900 mb-6">Empowering the Next Generation of Visual Storytellers</h2>
-            <p>
-                Creative Space is more than just a digital gallery; it is a global ecosystem designed to connect, inspire, and elevate artists from every corner of the world. In an era where visual content dominates communication, having a dedicated platform that prioritizes quality, aesthetic integrity, and community engagement is essential. Our mission is to bridge the gap between emerging talent and global recognition, providing a seamless interface where photographers, digital artists, and designers can showcase their portfolios in high definition.
-            </p>
-            
-            <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">A Curated Sanctuary for Digital Art</h3>
-            <p>
-                Unlike traditional social media platforms where content is fleeting, Creative Space focuses on the longevity and impact of visual art. Our curation algorithms and community-driven filtering ensure that every visit provides a fresh dose of inspiration. From the raw emotion of analog photography to the precision of modern 3D rendering and the fluidity of motion graphics, our gallery encompasses a diverse spectrum of creative disciplines. We believe that art should not be confined by borders, which is why our infrastructure is built to support creators from Dhaka to New York, ensuring fast, responsive access to high-resolution media regardless of location.
-            </p>
+      {!selectedUserProfile && (
+        <section className="w-full bg-white border-y border-slate-100 py-16 reveal">
+            <div className="max-w-4xl mx-auto px-6 prose prose-lg prose-slate text-slate-600">
+                <h2 className="text-3xl font-black text-slate-900 mb-6">Empowering the Next Generation of Visual Storytellers</h2>
+                <p>
+                    Creative Space is more than just a digital gallery; it is a global ecosystem designed to connect, inspire, and elevate artists from every corner of the world. In an era where visual content dominates communication, having a dedicated platform that prioritizes quality, aesthetic integrity, and community engagement is essential. Our mission is to bridge the gap between emerging talent and global recognition, providing a seamless interface where photographers, digital artists, and designers can showcase their portfolios in high definition.
+                </p>
+                
+                <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">A Curated Sanctuary for Digital Art</h3>
+                <p>
+                    Unlike traditional social media platforms where content is fleeting, Creative Space focuses on the longevity and impact of visual art. Our curation algorithms and community-driven filtering ensure that every visit provides a fresh dose of inspiration. From the raw emotion of analog photography to the precision of modern 3D rendering and the fluidity of motion graphics, our gallery encompasses a diverse spectrum of creative disciplines. We believe that art should not be confined by borders, which is why our infrastructure is built to support creators from Dhaka to New York, ensuring fast, responsive access to high-resolution media regardless of location.
+                </p>
 
-            <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Technology Meets Creativity</h3>
-            <p>
-                Built with cutting-edge web technologies, Creative Space offers a fluid, app-like experience directly in the browser. We utilize advanced image optimization, responsive grid layouts, and immersive lightbox features to present artwork as the artist intended. Our commitment to user experience extends to privacy and security, ensuring that while we foster open sharing, we also protect the intellectual property and personal data of our users. Whether you are a professional seeking a portfolio solution or an enthusiast looking for daily inspiration, Creative Space provides the tools and environment necessary to thrive in the digital creative economy.
-            </p>
-        </div>
-      </section>
+                <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Technology Meets Creativity</h3>
+                <p>
+                    Built with cutting-edge web technologies, Creative Space offers a fluid, app-like experience directly in the browser. We utilize advanced image optimization, responsive grid layouts, and immersive lightbox features to present artwork as the artist intended. Our commitment to user experience extends to privacy and security, ensuring that while we foster open sharing, we also protect the intellectual property and personal data of our users. Whether you are a professional seeking a portfolio solution or an enthusiast looking for daily inspiration, Creative Space provides the tools and environment necessary to thrive in the digital creative economy.
+                </p>
+            </div>
+        </section>
+      )}
 
       {/* Footer Ad */}
       <div className="max-w-[1200px] mx-auto px-4 mb-8 reveal">

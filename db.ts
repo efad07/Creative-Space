@@ -67,6 +67,43 @@ const SEED_DATA: Partial<MediaItem>[] = [
   }
 ];
 
+const SEED_USERS: User[] = [
+  {
+    name: 'Sarah Jenkins',
+    email: 'sarah@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
+    bio: 'Nature photographer capturing the silence of the mountains.',
+    location: 'Denver, CO',
+    website: 'https://sarah.photo',
+    password: 'password'
+  },
+  {
+    name: 'David Lee',
+    email: 'david@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
+    bio: 'Student & Lifestyle Blogger. Documenting the journey.',
+    location: 'San Francisco, CA',
+    password: 'password'
+  },
+  {
+    name: 'Alex Tech',
+    email: 'alex@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
+    bio: 'Tech reviewer and workspace enthusiast.',
+    location: 'Austin, TX',
+    password: 'password'
+  },
+  {
+    name: 'Creative Studio',
+    email: 'studio@example.com',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Studio',
+    bio: 'A collective of digital artists pushing boundaries.',
+    location: 'London, UK',
+    website: 'https://studio.design',
+    password: 'password'
+  }
+];
+
 export const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -91,18 +128,26 @@ export const initDB = (): Promise<IDBDatabase> => {
 
 const seedDatabase = async (db: IDBDatabase) => {
   return new Promise<void>((resolve) => {
-     const transaction = db.transaction([STORE_MEDIA], 'readwrite');
-     const store = transaction.objectStore(STORE_MEDIA);
+     // Ensure we open a transaction for both stores we intend to seed
+     const transaction = db.transaction([STORE_MEDIA, STORE_USERS], 'readwrite');
      
-     // Check count
-     const countRequest = store.count();
-     countRequest.onsuccess = () => {
-       if (countRequest.result === 0) {
-         // Seed
-         SEED_DATA.forEach(item => store.add(item));
-         console.log("Database seeded with sample content");
+     const mediaStore = transaction.objectStore(STORE_MEDIA);
+     const mediaCountRequest = mediaStore.count();
+     mediaCountRequest.onsuccess = () => {
+       if (mediaCountRequest.result === 0) {
+         SEED_DATA.forEach(item => mediaStore.add(item));
+         console.log("Database seeded with sample media");
        }
      };
+
+     const userStore = transaction.objectStore(STORE_USERS);
+     const userCountRequest = userStore.count();
+     userCountRequest.onsuccess = () => {
+         if (userCountRequest.result === 0) {
+             SEED_USERS.forEach(user => userStore.add(user));
+             console.log("Database seeded with sample users");
+         }
+     }
      
      transaction.oncomplete = () => resolve();
      transaction.onerror = () => resolve(); 
@@ -234,6 +279,25 @@ export const saveUserToDB = async (user: User): Promise<void> => {
         store.put(user);
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
+    });
+};
+
+export const getAllUsers = async (): Promise<User[]> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_USERS], 'readonly');
+      const store = transaction.objectStore(STORE_USERS);
+      const request = store.getAll();
+      
+      request.onsuccess = () => {
+          // Return users without passwords for security in frontend lists
+          const users = request.result.map((user: User) => {
+              const { password, ...safeUser } = user;
+              return safeUser;
+          });
+          resolve(users);
+      };
+      request.onerror = () => reject(request.error);
     });
 };
 
