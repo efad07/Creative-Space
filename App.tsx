@@ -14,7 +14,7 @@ import AboutModal from './components/AboutModal';
 import ContactModal from './components/ContactModal';
 import TermsModal from './components/TermsModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData } from './types';
-import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X } from 'lucide-react';
+import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB } from './db';
 
 // Sample Data for Blog with Timestamps for Expiration Logic
@@ -544,6 +544,14 @@ const App: React.FC = () => {
         <button onClick={() => setActiveNav('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
         {currentUser && <button onClick={() => setActiveNav('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
         
+        {/* Added Policy Links to Nav for AdSense Compliance */}
+        <div className="hidden lg:flex items-center gap-1 mx-2">
+            <button onClick={() => setActiveModal('about')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">About</button>
+            <button onClick={() => setActiveModal('privacy')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">Privacy</button>
+            <button onClick={() => setActiveModal('terms')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">Terms</button>
+            <button onClick={() => setActiveModal('contact')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">Contact</button>
+        </div>
+
         <div className="w-px h-6 bg-slate-200/50 mx-2 hidden sm:block"></div>
 
         {currentUser ? (
@@ -708,21 +716,98 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      {/* SEO / Publisher Content Section for AdSense */}
+      <section className="w-full bg-white border-y border-slate-100 py-16 reveal">
+        <div className="max-w-4xl mx-auto px-6 prose prose-lg prose-slate text-slate-600">
+            <h2 className="text-3xl font-black text-slate-900 mb-6">Empowering the Next Generation of Visual Storytellers</h2>
+            <p>
+                Creative Space is more than just a digital gallery; it is a global ecosystem designed to connect, inspire, and elevate artists from every corner of the world. In an era where visual content dominates communication, having a dedicated platform that prioritizes quality, aesthetic integrity, and community engagement is essential. Our mission is to bridge the gap between emerging talent and global recognition, providing a seamless interface where photographers, digital artists, and designers can showcase their portfolios in high definition.
+            </p>
+            
+            <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">A Curated Sanctuary for Digital Art</h3>
+            <p>
+                Unlike traditional social media platforms where content is fleeting, Creative Space focuses on the longevity and impact of visual art. Our curation algorithms and community-driven filtering ensure that every visit provides a fresh dose of inspiration. From the raw emotion of analog photography to the precision of modern 3D rendering and the fluidity of motion graphics, our gallery encompasses a diverse spectrum of creative disciplines. We believe that art should not be confined by borders, which is why our infrastructure is built to support creators from Dhaka to New York, ensuring fast, responsive access to high-resolution media regardless of location.
+            </p>
+
+            <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Technology Meets Creativity</h3>
+            <p>
+                Built with cutting-edge web technologies, Creative Space offers a fluid, app-like experience directly in the browser. We utilize advanced image optimization, responsive grid layouts, and immersive lightbox features to present artwork as the artist intended. Our commitment to user experience extends to privacy and security, ensuring that while we foster open sharing, we also protect the intellectual property and personal data of our users. Whether you are a professional seeking a portfolio solution or an enthusiast looking for daily inspiration, Creative Space provides the tools and environment necessary to thrive in the digital creative economy.
+            </p>
+        </div>
+      </section>
+
       {/* Footer Ad */}
       <div className="max-w-[1200px] mx-auto px-4 mb-8 reveal">
         <GoogleAd className="w-full h-[200px]" slot="5555555555" format="auto" />
       </div>
 
-      <footer className="bg-white/50 backdrop-blur-lg border-t border-slate-200 py-20 reveal">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-             <h2 className="text-4xl font-black mb-6 gradient-text hover:scale-105 transition-transform duration-500 cursor-default inline-block">{headerConfig.title}</h2>
-             <div className="flex justify-center gap-6 mb-8">
-                <button onClick={() => setActiveModal('about')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">About</button>
-                <button onClick={() => setActiveModal('privacy')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">Privacy</button>
-                <button onClick={() => setActiveModal('contact')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">Contact</button>
-                <button onClick={() => setActiveModal('terms')} className="text-slate-500 font-bold hover:text-purple-600 transition-colors hover:underline decoration-2 decoration-purple-300 underline-offset-4">Terms</button>
-             </div>
-             <p className="text-slate-400 text-sm font-medium">© 2025 Creative Space Studio. All rights reserved.</p>
+      <footer className="bg-slate-50 border-t border-slate-200 pt-20 pb-12 reveal">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+                {/* Brand Column */}
+                <div className="col-span-1 md:col-span-1">
+                    <h3 className="text-3xl font-black gradient-text mb-4 inline-block">{headerConfig.title}</h3>
+                    <p className="text-slate-500 font-medium text-sm leading-relaxed mb-6">
+                        Empowering creators worldwide to share their vision. Join the global community of visual storytellers today.
+                    </p>
+                    <div className="flex gap-4">
+                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-purple-600 hover:scale-110 transition-all shadow-sm border border-slate-100">
+                            <Twitter size={18} />
+                        </a>
+                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-pink-600 hover:scale-110 transition-all shadow-sm border border-slate-100">
+                            <Instagram size={18} />
+                        </a>
+                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-blue-600 hover:scale-110 transition-all shadow-sm border border-slate-100">
+                            <Linkedin size={18} />
+                        </a>
+                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-blue-800 hover:scale-110 transition-all shadow-sm border border-slate-100">
+                            <Facebook size={18} />
+                        </a>
+                    </div>
+                </div>
+
+                {/* Company Column */}
+                <div>
+                    <h4 className="font-bold text-slate-900 text-lg mb-6">Company</h4>
+                    <ul className="space-y-3 text-sm font-medium text-slate-500">
+                        <li><button onClick={() => setActiveModal('about')} className="hover:text-purple-600 transition-colors">About Us</button></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Careers</a></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Blog</a></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Press Kit</a></li>
+                    </ul>
+                </div>
+
+                {/* Legal Column */}
+                <div>
+                    <h4 className="font-bold text-slate-900 text-lg mb-6">Legal</h4>
+                    <ul className="space-y-3 text-sm font-medium text-slate-500">
+                        <li><button onClick={() => setActiveModal('privacy')} className="hover:text-purple-600 transition-colors">Privacy Policy</button></li>
+                        <li><button onClick={() => setActiveModal('terms')} className="hover:text-purple-600 transition-colors">Terms of Service</button></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Cookie Policy</a></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Copyright</a></li>
+                    </ul>
+                </div>
+
+                {/* Support Column */}
+                <div>
+                    <h4 className="font-bold text-slate-900 text-lg mb-6">Support</h4>
+                    <ul className="space-y-3 text-sm font-medium text-slate-500">
+                        <li><button onClick={() => setActiveModal('contact')} className="hover:text-purple-600 transition-colors">Contact Us</button></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Help Center</a></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Community Guidelines</a></li>
+                        <li><a href="#" className="hover:text-purple-600 transition-colors">Report Abuse</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div className="pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2025 Creative Space Studio. All rights reserved.</p>
+                <div className="flex gap-6 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    <span>Dhaka, Bangladesh</span>
+                    <span>•</span>
+                    <span>English (US)</span>
+                </div>
+            </div>
         </div>
       </footer>
 
