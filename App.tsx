@@ -47,12 +47,15 @@ const INITIAL_STORIES: BlogPostData[] = [
   }
 ];
 
+// Unified Creative Background Image
+const DEFAULT_HEADER_PHOTO = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=2400&q=80";
+
 const App: React.FC = () => {
   // --- State ---
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({
     title: "Creative Space",
     description: "A curated collection of visual stories and inspiration.",
-    photoUrl: null
+    photoUrl: DEFAULT_HEADER_PHOTO
   });
 
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
@@ -132,7 +135,27 @@ const App: React.FC = () => {
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
         
         const savedConfig = await getConfigFromDB();
-        if (savedConfig) setHeaderConfig(savedConfig);
+        
+        // Force update the photo to the new Creative Space abstract art if it's not set or matches the old one
+        // This ensures the new requirement is met even for returning users
+        const shouldUpdatePhoto = !savedConfig || !savedConfig.photoUrl || savedConfig.photoUrl !== DEFAULT_HEADER_PHOTO;
+        
+        if (savedConfig) {
+            if (shouldUpdatePhoto && !savedConfig.photoUrl?.startsWith('data:')) {
+               // Only override if it wasn't a custom user upload (data uri)
+               // Or if user wants to reset to default
+               savedConfig.photoUrl = DEFAULT_HEADER_PHOTO;
+               await saveConfigToDB(savedConfig);
+            }
+            setHeaderConfig(savedConfig);
+        } else {
+             // Default for fresh load
+             setHeaderConfig({
+                title: "Creative Space",
+                description: "A curated collection of visual stories and inspiration.",
+                photoUrl: DEFAULT_HEADER_PHOTO
+             });
+        }
         
         const savedMedia = await getMediaItemsFromDB();
         
