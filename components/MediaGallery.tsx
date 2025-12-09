@@ -15,13 +15,14 @@ interface MediaGalleryProps {
   onSaveItem: (item: MediaItem) => void;
   onAddComment?: (id: string, text: string) => void;
   onShare?: (item: MediaItem) => void;
+  onSelectUser?: (user: { name: string, email: string, avatar?: string }) => void;
   currentUser: UserType | null;
   allowUpload?: boolean;
   viewMode: 'grid' | 'list';
 }
 
 const MediaGallery: React.FC<MediaGalleryProps> = ({ 
-  items, onAddItems, onUpdateItem, onRemoveItem, onOpenLightbox, onShowToast, onToggleLike, onClearAll, onSaveItem, onShare, currentUser, allowUpload = false, viewMode
+  items, onAddItems, onUpdateItem, onRemoveItem, onOpenLightbox, onShowToast, onToggleLike, onClearAll, onSaveItem, onShare, onSelectUser, currentUser, allowUpload = false, viewMode
 }) => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -209,8 +210,14 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                       {/* Grid View Overlay with Author Info */}
                       {viewMode === 'grid' && (
                           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) flex flex-col justify-end h-full">
-                               <div className="flex items-center gap-2 mb-3">
-                                   <div className="w-8 h-8 rounded-full border border-white/50 overflow-hidden bg-white/20 backdrop-blur-sm shrink-0">
+                               <div 
+                                  className="flex items-center gap-2 mb-3 cursor-pointer group/author"
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      if(onSelectUser && item.userId) onSelectUser({ name: item.authorName || 'User', email: item.userId, avatar: item.authorAvatar });
+                                  }}
+                                >
+                                   <div className="w-8 h-8 rounded-full border border-white/50 overflow-hidden bg-white/20 backdrop-blur-sm shrink-0 group-hover/author:scale-105 transition-transform">
                                        {item.authorAvatar ? (
                                            <img src={item.authorAvatar} alt={item.authorName} className="w-full h-full object-cover" />
                                        ) : (
@@ -219,7 +226,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                            </div>
                                        )}
                                    </div>
-                                   <span className="text-white text-xs font-bold truncate shadow-sm">{item.authorName}</span>
+                                   <span className="text-white text-xs font-bold truncate shadow-sm group-hover/author:text-purple-300 transition-colors">{item.authorName}</span>
                                </div>
                                
                                <div className="flex justify-between items-end">
@@ -252,7 +259,13 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                         <div className="flex-1 p-8 flex flex-col justify-center">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <div className="flex items-center gap-3 mb-3">
+                                    <div 
+                                        className="flex items-center gap-3 mb-3 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if(onSelectUser && item.userId) onSelectUser({ name: item.authorName || 'User', email: item.userId, avatar: item.authorAvatar });
+                                        }}
+                                    >
                                         <div className="w-8 h-8 rounded-full bg-slate-100 overflow-hidden">
                                            {item.authorAvatar ? (
                                              <img src={item.authorAvatar} alt={item.authorName} className="w-full h-full object-cover"/>
@@ -284,10 +297,10 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                 <button onClick={(e) => { e.stopPropagation(); onToggleLike(item.id); }} className={`flex items-center gap-2 font-bold transition-all active:scale-90 ${item.likedByUser ? 'text-pink-500' : 'text-slate-400 hover:text-slate-600'}`}>
                                     <Heart size={20} fill={item.likedByUser ? "currentColor" : "none"} /> {item.likes}
                                 </button>
-                                <button className="flex items-center gap-2 font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                <button onClick={(e) => { e.stopPropagation(); onOpenLightbox(idx); }} className="flex items-center gap-2 font-bold text-slate-400 hover:text-indigo-600 transition-colors">
                                     <MessageCircle size={20} /> {item.comments?.length || 0}
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); onShare && onShare(item); }} className="flex items-center gap-2 font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                <button onClick={(e) => { e.stopPropagation(); onShare && onShare(item); }} className="flex items-center gap-2 font-bold text-slate-400 hover:text-indigo-600 transition-colors">
                                     <Share2 size={20} />
                                 </button>
 

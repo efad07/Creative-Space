@@ -1,7 +1,7 @@
 
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, Eye, ExternalLink, MessageCircle, Share2, Send, MoreHorizontal } from 'lucide-react';
-import { MediaItem } from '../types';
+import { X, ChevronLeft, ChevronRight, Heart, ExternalLink, MessageCircle, Share2, Send, MoreHorizontal, Trash2 } from 'lucide-react';
+import { MediaItem, User } from '../types';
 
 interface LightboxProps {
   items: MediaItem[];
@@ -12,7 +12,10 @@ interface LightboxProps {
   onPrev: () => void;
   onToggleLike?: (id: string) => void;
   onAddComment?: (id: string, text: string) => void;
+  onDeleteComment?: (itemId: string, commentId: string) => void;
   onShare?: (item: MediaItem) => void;
+  onSelectUser?: (user: { name: string, email: string, avatar?: string }) => void;
+  currentUser?: User | null;
 }
 
 const Lightbox: React.FC<LightboxProps> = ({ 
@@ -24,7 +27,10 @@ const Lightbox: React.FC<LightboxProps> = ({
   onPrev,
   onToggleLike,
   onAddComment,
-  onShare
+  onDeleteComment,
+  onShare,
+  onSelectUser,
+  currentUser
 }) => {
   const currentItem = items[currentIndex];
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -56,7 +62,7 @@ const Lightbox: React.FC<LightboxProps> = ({
     if (commentsEndRef.current) {
         commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [currentItem?.comments]);
+  }, [currentItem?.comments?.length]);
 
   // Touch/Swipe Logic
   const minSwipeDistance = 50;
@@ -90,6 +96,34 @@ const Lightbox: React.FC<LightboxProps> = ({
       onAddComment(currentItem.id, commentText);
       setCommentText('');
   };
+
+  const handleAuthorClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelectUser && currentItem.userId) {
+        onSelectUser({ 
+            name: currentItem.authorName || 'User', 
+            email: currentItem.userId, 
+            avatar: currentItem.authorAvatar 
+        });
+        onClose();
+    }
+  }
+
+  // Helper for relative time
+  function timeAgo(timestamp: number) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + "y";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + "mo";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + "d";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + "h";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + "m";
+    return Math.floor(seconds) + "s";
+  }
 
   if (!isOpen || !currentItem) return null;
 
@@ -148,12 +182,12 @@ const Lightbox: React.FC<LightboxProps> = ({
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent lg:hidden flex flex-col gap-2">
                  <h2 className="text-white text-xl font-bold truncate">{currentItem.title || "Untitled"}</h2>
                  <div className="flex items-center justify-between text-white/80">
-                    <div className="flex items-center gap-2">
+                    <button onClick={handleAuthorClick} className="flex items-center gap-2">
                          <div className="w-6 h-6 rounded-full bg-slate-500 overflow-hidden">
                              {currentItem.authorAvatar && <img src={currentItem.authorAvatar} className="w-full h-full object-cover"/>}
                          </div>
                          <span className="text-sm font-semibold">{currentItem.authorName}</span>
-                    </div>
+                    </button>
                     <div className="flex gap-4">
                         <button onClick={(e) => {e.stopPropagation(); onToggleLike && onToggleLike(currentItem.id)}} className="flex flex-col items-center">
                             <Heart size={24} fill={currentItem.likedByUser ? "white" : "none"} className={currentItem.likedByUser ? "text-pink-500" : "text-white"} />
@@ -181,19 +215,19 @@ const Lightbox: React.FC<LightboxProps> = ({
 
              {/* Header: Author & Actions */}
              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-                 <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
+                 <button onClick={handleAuthorClick} className="flex items-center gap-3 group">
+                     <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
                          {currentItem.authorAvatar ? (
                              <img src={currentItem.authorAvatar} alt={currentItem.authorName} className="w-full h-full object-cover" />
                          ) : (
                              <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">{currentItem.authorName?.charAt(0)}</div>
                          )}
                      </div>
-                     <div className="leading-tight">
-                         <div className="font-bold text-slate-900 text-sm">{currentItem.authorName}</div>
+                     <div className="leading-tight text-left">
+                         <div className="font-bold text-slate-900 text-sm group-hover:text-purple-600 transition-colors">{currentItem.authorName}</div>
                          <div className="text-xs text-slate-500 font-medium">Original Creator</div>
                      </div>
-                 </div>
+                 </button>
                  <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full"><MoreHorizontal size={20}/></button>
              </div>
 
@@ -218,24 +252,47 @@ const Lightbox: React.FC<LightboxProps> = ({
                  <div className="space-y-4">
                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Comments ({currentItem.comments?.length || 0})</h3>
                      {currentItem.comments && currentItem.comments.length > 0 ? (
-                         currentItem.comments.map((comment) => (
-                             <div key={comment.id} className="flex gap-3 group">
-                                 <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 overflow-hidden mt-1">
-                                     {comment.userAvatar ? <img src={comment.userAvatar} className="w-full h-full object-cover"/> : null}
-                                 </div>
-                                 <div className="flex-1">
-                                     <div className="bg-slate-50 rounded-2xl p-3 text-sm">
-                                         <span className="font-bold text-slate-900 mr-2">{comment.userName}</span>
-                                         <span className="text-slate-600">{comment.text}</span>
-                                     </div>
-                                     <div className="flex items-center gap-4 mt-1 pl-2">
-                                         <span className="text-[10px] text-slate-400 font-bold">Like</span>
-                                         <span className="text-[10px] text-slate-400 font-bold">Reply</span>
-                                         <span className="text-[10px] text-slate-400">{new Date(comment.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                     </div>
-                                 </div>
-                             </div>
-                         ))
+                         currentItem.comments.map((comment) => {
+                             const canDelete = currentUser && (comment.userId === currentUser.email || currentItem.userId === currentUser.email);
+                             return (
+                                <div key={comment.id} className="flex gap-3 group relative">
+                                    <div 
+                                        className="w-8 h-8 rounded-full bg-slate-100 shrink-0 overflow-hidden mt-1 cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onSelectUser) onSelectUser({ name: comment.userName, email: comment.userId, avatar: comment.userAvatar });
+                                            onClose();
+                                        }}
+                                    >
+                                        {comment.userAvatar ? <img src={comment.userAvatar} className="w-full h-full object-cover"/> : null}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="bg-slate-50 rounded-2xl p-3 text-sm pr-8 relative">
+                                            <span className="font-bold text-slate-900 mr-2 cursor-pointer hover:text-purple-600" onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (onSelectUser) onSelectUser({ name: comment.userName, email: comment.userId, avatar: comment.userAvatar });
+                                                onClose();
+                                            }}>{comment.userName}</span>
+                                            <span className="text-slate-600">{comment.text}</span>
+                                            
+                                            {canDelete && (
+                                                <button 
+                                                    onClick={() => onDeleteComment && onDeleteComment(currentItem.id, comment.id)}
+                                                    className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                                                    title="Delete Comment"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-1 pl-2">
+                                            <span className="text-[10px] text-slate-400">{timeAgo(comment.timestamp)} ago</span>
+                                            <button className="text-[10px] text-slate-400 font-bold hover:text-slate-600">Reply</button>
+                                        </div>
+                                    </div>
+                                </div>
+                             )
+                         })
                      ) : (
                          <div className="text-center py-8 text-slate-400 italic text-sm">No comments yet. Be the first to say something!</div>
                      )}

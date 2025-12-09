@@ -14,8 +14,9 @@ import AboutModal from './components/AboutModal';
 import ContactModal from './components/ContactModal';
 import TermsModal from './components/TermsModal';
 import UserSearchModal from './components/UserSearchModal';
+import ShareModal from './components/ShareModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData, Comment } from './types';
-import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users } from 'lucide-react';
+import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users, Share2 } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
 
 // Sample Data for Blog with Timestamps for Expiration Logic
@@ -64,6 +65,9 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [activeModal, setActiveModal] = useState<'auth' | 'profile' | 'privacy' | 'about' | 'contact' | 'terms' | 'userSearch' | null>(null);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  
+  // Share Modal State
+  const [shareData, setShareData] = useState<{ url: string, title: string, text: string } | null>(null);
   
   // Story States
   const [stories, setStories] = useState<BlogPostData[]>(INITIAL_STORIES);
@@ -169,6 +173,44 @@ const App: React.FC = () => {
         objectUrlsRef.current = [];
     };
   }, []);
+
+  // --- Deep Link Handler ---
+  useEffect(() => {
+    if (!isLoading && mediaItems.length > 0) {
+        const params = new URLSearchParams(window.location.search);
+        const itemId = params.get('item');
+        const userEmail = params.get('user');
+
+        if (itemId) {
+            // If deep linking to an item, ensure we are in a state to see it
+            setActiveNav('All');
+            setActiveCategory('All');
+            setSearchQuery('');
+            setSelectedUserProfile(null);
+            
+            const index = mediaItems.findIndex(i => i.id === itemId);
+            if (index !== -1) {
+                setLightboxState({ isOpen: true, index });
+                showToast("Shared item loaded!", 'success');
+            } else {
+                showToast("Item not found or private", 'error');
+            }
+        } else if (userEmail) {
+             const user = allUsers.find(u => u.email === userEmail);
+             if (user) {
+                 setSelectedUserProfile(user);
+                 showToast(`Viewing ${user.name}'s profile`, 'success');
+             } else {
+                 showToast("User not found", 'error');
+             }
+        }
+        
+        // Clean URL after handling to prevent loop/stuck state
+        if (itemId || userEmail) {
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+    }
+  }, [isLoading, mediaItems.length, allUsers.length]);
 
   // Sync users when registered
   const refreshUsers = async () => {
@@ -384,21 +426,50 @@ const App: React.FC = () => {
     showToast('Comment added', 'success');
   };
 
-  const handleShare = async (item: MediaItem) => {
-      if (navigator.share) {
-          try {
-              await navigator.share({
-                  title: item.title || 'Check this out!',
-                  text: `Check out this amazing content by ${item.authorName} on Creative Space.`,
-                  url: window.location.href
-              });
-          } catch (error) {
-              console.log('Error sharing', error);
+  const handleDeleteComment = (itemId: string, commentId: string) => {
+      setMediaItems(prev => prev.map(item => {
+          if (item.id === itemId && item.comments) {
+              const updated = { ...item, comments: item.comments.filter(c => c.id !== commentId) };
+              saveMediaItemToDB(updated);
+              return updated;
           }
-      } else {
-           navigator.clipboard.writeText(window.location.href);
-           showToast('Link copied to clipboard', 'success');
+          return item;
+      }));
+      showToast('Comment deleted', 'success');
+  };
+
+  const handleShare = async (item?: MediaItem) => {
+      let shareUrl = window.location.origin + window.location.pathname;
+      let title = 'Creative Space';
+      let text = 'Check out this amazing creative community!';
+
+      if (item) {
+          shareUrl = `${shareUrl}?item=${item.id}`;
+          title = item.title || 'Check this out!';
+          text = `Check out this amazing content by ${item.authorName} on Creative Space.`;
+      } else if (selectedUserProfile) {
+          shareUrl = `${shareUrl}?user=${selectedUserProfile.email}`;
+          title = `${selectedUserProfile.name} on Creative Space`;
+          text = `Check out ${selectedUserProfile.name}'s portfolio on Creative Space.`;
       }
+
+      // 1. Try Native Share first (Mobile/Tablet)
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: title,
+            text: text,
+            url: shareUrl,
+          });
+          return;
+        } catch (error) {
+          console.log('Error sharing:', error);
+          // Fallback to modal if native share is cancelled or fails
+        }
+      }
+
+      // 2. Fallback to Modal (Desktop/Unsupported)
+      setShareData({ url: shareUrl, title, text });
   };
 
   const handleStoryOpen = (index: number) => {
@@ -511,6 +582,9 @@ const App: React.FC = () => {
     : [];
 
   const handleUserSelect = (user: User) => {
+      // Switch view mode first to clear current state
+      setActiveNav('All');
+      // Then set user
       setSelectedUserProfile(user);
       setSearchQuery(''); // Clear search to show full profile
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -712,6 +786,15 @@ const App: React.FC = () => {
                      {/* Decorative background blur */}
                      <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
+                     {/* Profile Share Button */}
+                     <button 
+                         onClick={() => handleShare()}
+                         className="absolute top-8 right-8 p-3 bg-white/50 hover:bg-white rounded-full text-slate-500 hover:text-purple-600 transition-all shadow-sm border border-slate-100/50"
+                         title="Share Profile"
+                     >
+                         <Share2 size={20} />
+                     </button>
+
                      <div className="w-32 h-32 md:w-40 md:h-40 rounded-full p-1 bg-gradient-to-br from-purple-500 to-pink-500 shadow-xl shrink-0">
                          <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-white">
                              {selectedUserProfile.avatar ? (
@@ -883,6 +966,7 @@ const App: React.FC = () => {
                 onSaveItem={handleSaveItem}
                 onAddComment={handleAddComment}
                 onShare={handleShare}
+                onSelectUser={handleUserSelect}
                 currentUser={currentUser}
                 allowUpload={selectedUserProfile ? (currentUser?.email === selectedUserProfile.email) : (activeNav === 'My Gallery')}
                 viewMode={viewMode}
@@ -1006,7 +1090,10 @@ const App: React.FC = () => {
         }}
         onToggleLike={toggleLike}
         onAddComment={handleAddComment}
+        onDeleteComment={handleDeleteComment}
         onShare={handleShare}
+        onSelectUser={handleUserSelect}
+        currentUser={currentUser}
       />
       
       {/* Immersive Story Viewer */}
@@ -1128,6 +1215,16 @@ const App: React.FC = () => {
             users={allUsers}
             onClose={() => setActiveModal(null)}
             onSelect={handleUserSelect}
+        />
+      )}
+
+      {/* Share Modal */}
+      {shareData && (
+        <ShareModal 
+            url={shareData.url}
+            title={shareData.title}
+            text={shareData.text}
+            onClose={() => setShareData(null)}
         />
       )}
     </div>
