@@ -50,6 +50,9 @@ const INITIAL_STORIES: BlogPostData[] = [
 // Unified Creative Background Image
 const DEFAULT_HEADER_PHOTO = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=2400&q=80";
 
+// Google Apps Script Web App URL
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqaSNGx0Ka-wAj-xZfV9QZZt3VLnvNmvrvObJTPVeoqkO3ST3rjT9IRcOBFYvFUt0B/exec';
+
 const App: React.FC = () => {
   // --- State ---
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>({
@@ -645,24 +648,92 @@ const App: React.FC = () => {
   };
 
   const onEmailLogin = async (email: string, pass: string) => {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const user = await authenticateUser(email, pass);
-      setCurrentUser(user);
-      localStorage.setItem('creative_space_user', JSON.stringify(user));
-      showToast('Welcome back!', 'success');
-      return user;
+      try {
+        const formData = new FormData();
+        formData.append('action', 'signin');
+        formData.append('email', email);
+        formData.append('password', pass);
+
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+             const user: User = {
+                name: result.data.name,
+                email: email,
+                avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${result.data.name.replace(/\s/g, '')}`
+             };
+             
+             // Check if we have local user data (for custom avatars/bio etc)
+             try {
+                const localUser = await authenticateUser(email, pass).catch(() => null);
+                if (localUser && localUser.avatar) {
+                    user.avatar = localUser.avatar;
+                    user.bio = localUser.bio;
+                    user.location = localUser.location;
+                    user.website = localUser.website;
+                } else {
+                    await saveUserToDB(user);
+                }
+             } catch(e) {
+                // If local auth fails (e.g. not in DB yet), just save the new user object
+                await saveUserToDB(user);
+             }
+
+             setCurrentUser(user);
+             localStorage.setItem('creative_space_user', JSON.stringify(user));
+             showToast(`Welcome back, ${user.name}!`, 'success');
+             return user;
+        } else {
+             throw new Error(result.message);
+        }
+      } catch (error: any) {
+        console.error("Login Error:", error);
+        throw new Error(error.message || "Failed to connect to authentication server.");
+      }
   };
 
   const onEmailRegister = async (email: string, pass: string, name: string) => {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const user = await registerUser(email, pass, name);
-      await refreshUsers();
-      setCurrentUser(user);
-      localStorage.setItem('creative_space_user', JSON.stringify(user));
-      showToast('Account created successfully!', 'success');
-      return user;
+      try {
+        const formData = new FormData();
+        formData.append('action', 'signup');
+        formData.append('fullName', name);
+        formData.append('email', email);
+        formData.append('password', pass);
+
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const user: User = {
+                name: name,
+                email: email,
+                avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s/g, '')}`
+            };
+            
+            // Sync with local DB
+            await saveUserToDB(user);
+            await refreshUsers();
+
+            setCurrentUser(user);
+            localStorage.setItem('creative_space_user', JSON.stringify(user));
+            showToast(`Account created! Welcome, ${user.name}!`, 'success');
+            return user;
+        } else {
+            throw new Error(result.message);
+        }
+      } catch (error: any) {
+        console.error("Register Error:", error);
+        throw new Error(error.message || "Failed to connect to authentication server.");
+      }
   };
   
   const handleUpdateProfile = async (updates: Partial<User>) => {
