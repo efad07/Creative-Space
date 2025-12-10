@@ -17,7 +17,7 @@ import UserSearchModal from './components/UserSearchModal';
 import ShareModal from './components/ShareModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData, Comment } from './types';
 import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users, Share2 } from 'lucide-react';
-import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, registerUser, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
+import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
 
 // Sample Data for Blog with Timestamps for Expiration Logic
 const INITIAL_STORIES: BlogPostData[] = [
