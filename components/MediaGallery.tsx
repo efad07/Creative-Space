@@ -1,4 +1,3 @@
-
 import React, { useRef, useState } from 'react';
 import { Image as ImageIcon, Film, Trash2, Heart, Bookmark, Loader2, Plus, Layers, Edit2, Link as LinkIcon, Check, X, MessageCircle, Share2 } from 'lucide-react';
 import { MediaItem, User as UserType } from '../types';
@@ -184,8 +183,8 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
           <div className={viewMode === 'grid' ? "columns-1 sm:columns-2 lg:columns-3 gap-8 space-y-8" : "flex flex-col gap-6"}>
               {items.map((item, idx) => (
                 <div key={item.id} 
-                      className={`break-inside-avoid relative group rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-500 cursor-pointer border border-white/50 opacity-0 animate-fade-up ${viewMode === 'list' ? 'flex h-64 hover:-translate-y-1' : 'hover:-translate-y-2 hover:rotate-1'}`}
-                      style={{ animationDelay: `${idx * 100}ms` }}
+                      className={`break-inside-avoid relative group rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer border border-white/50 opacity-0 animate-fade-up ${viewMode === 'list' ? 'flex h-64 hover:-translate-y-1' : 'hover:-translate-y-1'}`}
+                      style={{ animationDelay: `${Math.min(idx * 50, 500)}ms` }}
                       onClick={() => onOpenLightbox(idx)}
                 >
                     {/* Media Display */}
@@ -194,13 +193,15 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                         <img 
                           src={item.url} 
                           alt={item.name} 
-                          className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000 ease-out"
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500 ease-out will-change-transform"
                         />
                       ) : (
-                        <div className="w-full h-full bg-slate-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-1000 ease-out">
+                        <div className="w-full h-full bg-slate-900 flex items-center justify-center group-hover:scale-105 transition-transform duration-500 ease-out">
                           <video src={item.url} className="w-full h-full object-cover opacity-80" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                           <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/50 animate-pulse">
+                              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/50">
                                   <Film size={20} />
                               </div>
                           </div>
@@ -209,7 +210,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                       
                       {/* Grid View Overlay with Author Info */}
                       {viewMode === 'grid' && (
-                          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) flex flex-col justify-end h-full">
+                          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 cubic-bezier(0.16, 1, 0.3, 1) flex flex-col justify-end h-full">
                                <div 
                                   className="flex items-center gap-2 mb-3 cursor-pointer group/author"
                                   onClick={(e) => {
@@ -219,7 +220,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                 >
                                    <div className="w-8 h-8 rounded-full border border-white/50 overflow-hidden bg-white/20 backdrop-blur-sm shrink-0 group-hover/author:scale-105 transition-transform">
                                        {item.authorAvatar ? (
-                                           <img src={item.authorAvatar} alt={item.authorName} className="w-full h-full object-cover" />
+                                           <img src={item.authorAvatar} alt={item.authorName} className="w-full h-full object-cover" loading="lazy" />
                                        ) : (
                                            <div className="w-full h-full flex items-center justify-center text-white text-[10px] font-bold bg-slate-500">
                                                {item.authorName?.charAt(0)}
@@ -240,16 +241,6 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                     </button>
                                   </div>
                                </div>
-                               
-                               {/* Hover Stats */}
-                               <div className="flex gap-4 mt-3 pt-3 border-t border-white/10">
-                                  <div className="flex items-center gap-1.5 text-white/80 text-xs font-bold">
-                                     <Heart size={14}/> {item.likes}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-white/80 text-xs font-bold">
-                                     <MessageCircle size={14}/> {item.comments?.length || 0}
-                                  </div>
-                               </div>
                           </div>
                       )}
                     </div>
@@ -268,7 +259,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                                     >
                                         <div className="w-8 h-8 rounded-full bg-slate-100 overflow-hidden">
                                            {item.authorAvatar ? (
-                                             <img src={item.authorAvatar} alt={item.authorName} className="w-full h-full object-cover"/>
+                                             <img src={item.authorAvatar} alt={item.authorName} className="w-full h-full object-cover" loading="lazy" />
                                            ) : (
                                              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">{item.authorName?.charAt(0)}</div>
                                            )}

@@ -1,23 +1,24 @@
-
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import Header from './components/Header';
 import MediaGallery from './components/MediaGallery';
 import Lightbox from './components/Lightbox';
 import Toast from './components/Toast';
 import SearchBar from './components/SearchBar';
 import GoogleAd from './components/GoogleAd';
-import StoryViewer from './components/StoryViewer';
-import ProfileSettings from './components/ProfileSettings';
-import AuthModal from './components/AuthModal';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import AboutModal from './components/AboutModal';
-import ContactModal from './components/ContactModal';
-import TermsModal from './components/TermsModal';
-import UserSearchModal from './components/UserSearchModal';
-import ShareModal from './components/ShareModal';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData, Comment } from './types';
-import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users, Share2 } from 'lucide-react';
+import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users, Share2, Loader2 } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
+
+// Lazy Load Heavy Modals for Performance
+const StoryViewer = React.lazy(() => import('./components/StoryViewer'));
+const ProfileSettings = React.lazy(() => import('./components/ProfileSettings'));
+const AuthModal = React.lazy(() => import('./components/AuthModal'));
+const PrivacyPolicy = React.lazy(() => import('./components/PrivacyPolicy'));
+const AboutModal = React.lazy(() => import('./components/AboutModal'));
+const ContactModal = React.lazy(() => import('./components/ContactModal'));
+const TermsModal = React.lazy(() => import('./components/TermsModal'));
+const UserSearchModal = React.lazy(() => import('./components/UserSearchModal'));
+const ShareModal = React.lazy(() => import('./components/ShareModal'));
 
 // Sample Data for Blog with Timestamps for Expiration Logic
 const INITIAL_STORIES: BlogPostData[] = [
@@ -28,7 +29,7 @@ const INITIAL_STORIES: BlogPostData[] = [
     date: 'Today',
     author: 'Elena Fisher',
     readTime: '5 min',
-    imageUrl: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=75',
     tags: ['Photography'],
     content: `<p>Full content...</p>`,
     timestamp: Date.now()
@@ -40,7 +41,7 @@ const INITIAL_STORIES: BlogPostData[] = [
     date: 'Today',
     author: 'Marcus Chen',
     readTime: '8 min',
-    imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=75',
     tags: ['Design'],
     content: `<p>Full content...</p>`,
     timestamp: Date.now() - 3600000 // 1 hour ago
@@ -48,7 +49,7 @@ const INITIAL_STORIES: BlogPostData[] = [
 ];
 
 // Unified Creative Background Image
-const DEFAULT_HEADER_PHOTO = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=2400&q=80";
+const DEFAULT_HEADER_PHOTO = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80";
 
 // Google Apps Script Web App URL
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqaSNGx0Ka-wAj-xZfV9QZZt3VLnvNmvrvObJTPVeoqkO3ST3rjT9IRcOBFYvFUt0B/exec';
@@ -118,16 +119,21 @@ const App: React.FC = () => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           entry.target.classList.add('active');
+          // Once revealed, stop observing to save resources
+          observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.1 });
+    }, { threshold: 0.05, rootMargin: '50px' });
 
     // Delay slightly to ensure DOM is ready
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
     }, 500);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
   }, [mediaItems, activeNav, viewMode, activeCategory, selectedUserProfile]);
 
   // --- Initialization ---
@@ -139,20 +145,15 @@ const App: React.FC = () => {
         
         const savedConfig = await getConfigFromDB();
         
-        // Force update the photo to the new Creative Space abstract art if it's not set or matches the old one
-        // This ensures the new requirement is met even for returning users
         const shouldUpdatePhoto = !savedConfig || !savedConfig.photoUrl || savedConfig.photoUrl !== DEFAULT_HEADER_PHOTO;
         
         if (savedConfig) {
             if (shouldUpdatePhoto && !savedConfig.photoUrl?.startsWith('data:')) {
-               // Only override if it wasn't a custom user upload (data uri)
-               // Or if user wants to reset to default
                savedConfig.photoUrl = DEFAULT_HEADER_PHOTO;
                await saveConfigToDB(savedConfig);
             }
             setHeaderConfig(savedConfig);
         } else {
-             // Default for fresh load
              setHeaderConfig({
                 title: "Creative Space",
                 description: "A curated collection of visual stories and inspiration.",
@@ -162,7 +163,6 @@ const App: React.FC = () => {
         
         const savedMedia = await getMediaItemsFromDB();
         
-        // Track URLs created by getMediaItemsFromDB for cleanup
         savedMedia.forEach(item => {
             if (item.url.startsWith('blob:')) {
                 objectUrlsRef.current.push(item.url);
@@ -171,15 +171,12 @@ const App: React.FC = () => {
 
         setMediaItems(savedMedia);
 
-        // Load all users for search
         const users = await getAllUsers();
         setAllUsers(users);
         
-        // Load watched stories
         const savedWatched = localStorage.getItem('creative_space_watched_stories');
         if(savedWatched) setWatchedStories(JSON.parse(savedWatched));
 
-        // Load custom stories if any (Persistence Logic)
         const savedStories = localStorage.getItem('creative_space_stories');
         if(savedStories) {
             setStories(JSON.parse(savedStories));
@@ -187,13 +184,11 @@ const App: React.FC = () => {
       } catch (error) {
         console.error("Failed to load data", error);
       } finally {
-        // Add a small artificial delay for the splash screen effect
-        setTimeout(() => setIsLoading(false), 800);
+        setTimeout(() => setIsLoading(false), 500);
       }
     };
     loadData();
 
-    // Cleanup function to release memory when app unmounts
     return () => {
         objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
         objectUrlsRef.current = [];
@@ -208,7 +203,6 @@ const App: React.FC = () => {
         const userEmail = params.get('user');
 
         if (itemId) {
-            // If deep linking to an item, ensure we are in a state to see it
             setActiveNav('All');
             setActiveCategory('All');
             setSearchQuery('');
@@ -218,27 +212,21 @@ const App: React.FC = () => {
             if (index !== -1) {
                 setLightboxState({ isOpen: true, index });
                 showToast("Shared item loaded!", 'success');
-            } else {
-                showToast("Item not found or private", 'error');
             }
         } else if (userEmail) {
              const user = allUsers.find(u => u.email === userEmail);
              if (user) {
                  setSelectedUserProfile(user);
                  showToast(`Viewing ${user.name}'s profile`, 'success');
-             } else {
-                 showToast("User not found", 'error');
              }
         }
         
-        // Clean URL after handling to prevent loop/stuck state
         if (itemId || userEmail) {
             window.history.replaceState(null, '', window.location.pathname);
         }
     }
   }, [isLoading, mediaItems.length, allUsers.length]);
 
-  // Sync users when registered
   const refreshUsers = async () => {
       try {
           const users = await getAllUsers();
@@ -246,11 +234,9 @@ const App: React.FC = () => {
       } catch (e) { console.error(e); }
   }
 
-  // Helper to persist stories
   const saveStoriesToLocal = (newStories: BlogPostData[]) => {
       setStories(newStories);
       try {
-          // Limit storage usage by only storing recent ones if needed, but for now allow all
           localStorage.setItem('creative_space_stories', JSON.stringify(newStories));
       } catch (e) {
           console.error("Failed to save stories locally (quota?)", e);
@@ -266,14 +252,10 @@ const App: React.FC = () => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // --- Helper to get Consistent Author Info ---
   const getCurrentAuthorInfo = () => {
     if (!currentUser) return { name: 'Guest User', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest', email: 'guest' };
-    
     const name = currentUser.name || 'Anonymous';
-    // Use uploaded avatar OR generate a deterministic one based on name so user always has a graphical avatar
     const avatar = currentUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s/g, '')}`;
-    
     return { name, avatar, email: currentUser.email };
   };
 
@@ -292,7 +274,6 @@ const App: React.FC = () => {
   const addMediaItems = async (newItems: MediaItem[]) => {
     const authorInfo = getCurrentAuthorInfo();
     
-    // Add new blob URLs to our tracking ref
     newItems.forEach(item => {
         if (item.url.startsWith('blob:')) {
             objectUrlsRef.current.push(item.url);
@@ -311,7 +292,6 @@ const App: React.FC = () => {
     for (const item of itemsWithUser) {
         if (item.url && item.url.startsWith('blob:')) {
             try {
-                // We fetch the blob from the objectURL to store it in DB
                 const response = await fetch(item.url);
                 const blob = await response.blob();
                 await saveMediaItemToDB({ ...item, blob });
@@ -334,7 +314,7 @@ const App: React.FC = () => {
   const removeMediaItem = async (id: string) => {
     setMediaItems(prev => prev.filter(item => {
         if (item.id === id && item.url.startsWith('blob:')) {
-            URL.revokeObjectURL(item.url); // Release memory immediately
+            URL.revokeObjectURL(item.url); 
         }
         return item.id !== id;
     }));
@@ -424,7 +404,6 @@ const App: React.FC = () => {
     }));
   };
 
-  // --- Comment & Share Handlers ---
   const handleAddComment = (itemId: string, text: string) => {
     if (!currentUser) {
         showToast('Please sign in to comment', 'error');
@@ -479,7 +458,6 @@ const App: React.FC = () => {
           text = `Check out ${selectedUserProfile.name}'s portfolio on Creative Space.`;
       }
 
-      // 1. Try Native Share first (Mobile/Tablet)
       if (navigator.share) {
         try {
           await navigator.share({
@@ -490,17 +468,13 @@ const App: React.FC = () => {
           return;
         } catch (error) {
           console.log('Error sharing:', error);
-          // Fallback to modal if native share is cancelled or fails
         }
       }
-
-      // 2. Fallback to Modal (Desktop/Unsupported)
       setShareData({ url: shareUrl, title, text });
   };
 
   const handleStoryOpen = (index: number) => {
     setViewingStoryIndex(index);
-    // Use activeStories to ensure index match
     const storyId = activeStories[index].id;
     if (!watchedStories.includes(storyId)) {
         const newWatched = [...watchedStories, storyId];
@@ -509,7 +483,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 1. Initial File Select -> Open Modal
   const handleStoryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -534,7 +507,6 @@ const App: React.FC = () => {
     e.target.value = '';
   };
 
-  // 2. Finalize Upload from Modal
   const finalizeStoryUpload = () => {
       if (!tempStoryImg) return;
       
@@ -579,22 +551,15 @@ const App: React.FC = () => {
     let items = mediaItems;
 
     if (selectedUserProfile) {
-        // If viewing a user profile, filter strictly by that user
         items = items.filter(item => item.userId === selectedUserProfile.email);
-        // Also apply search query within that profile
         if (searchQuery) items = items.filter(item => (item.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()));
     } else {
-        // Default Logic
         if (activeNav === 'My Gallery' && currentUser) items = items.filter(item => item.userId === currentUser.email);
-        
-        // Search Filter (for global feed)
-        // If searching users, the SearchBar dropdown handles navigation, but we also filter posts by title/author text
         if (searchQuery) {
             items = items.filter(item => (item.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || item.name.toLowerCase().includes(searchQuery.toLowerCase()));
         }
     }
     
-    // Category is always applied
     if (activeCategory !== 'All') items = items.filter(item => item.category === activeCategory);
     
     return items;
@@ -602,21 +567,17 @@ const App: React.FC = () => {
 
   const displayedItems = getDisplayedItems();
 
-  // Search logic for Users
   const matchedUsers = searchQuery 
     ? allUsers.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
     : [];
 
   const handleUserSelect = (user: User) => {
-      // Switch view mode first to clear current state
       setActiveNav('All');
-      // Then set user
       setSelectedUserProfile(user);
-      setSearchQuery(''); // Clear search to show full profile
+      setSearchQuery(''); 
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
-  // Auth Handlers
   const handleAuthClick = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
     setActiveModal('auth');
@@ -631,7 +592,6 @@ const App: React.FC = () => {
   };
 
   const onGoogleLogin = async () => {
-      // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const user = { name: "Google User", email: "google@user.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Google" };
@@ -668,7 +628,6 @@ const App: React.FC = () => {
                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${result.data.name.replace(/\s/g, '')}`
              };
              
-             // Check if we have local user data (for custom avatars/bio etc)
              try {
                 const localUser = await authenticateUser(email, pass).catch(() => null);
                 if (localUser && localUser.avatar) {
@@ -680,7 +639,6 @@ const App: React.FC = () => {
                     await saveUserToDB(user);
                 }
              } catch(e) {
-                // If local auth fails (e.g. not in DB yet), just save the new user object
                 await saveUserToDB(user);
              }
 
@@ -719,7 +677,6 @@ const App: React.FC = () => {
                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s/g, '')}`
             };
             
-            // Sync with local DB
             await saveUserToDB(user);
             await refreshUsers();
 
@@ -760,7 +717,6 @@ const App: React.FC = () => {
           setCurrentUser(updatedUser);
           await refreshUsers();
 
-          // --- SYNC UPDATE: Update all previous posts by this user ---
           if (updates.avatar || updates.name) {
              const newName = updatedUser.name;
              const newAvatar = updatedUser.avatar;
@@ -774,7 +730,6 @@ const App: React.FC = () => {
                  return item;
              }));
 
-             // Update stories and persist
              const updatedStories = stories.map(story => {
                 if (story.userId === currentUser.email) {
                     return { ...story, author: newName, authorAvatar: newAvatar };
@@ -792,10 +747,9 @@ const App: React.FC = () => {
       }
   };
 
-  // Switch Main Content based on State
   const handleNavChange = (nav: string) => {
       setActiveNav(nav);
-      setSelectedUserProfile(null); // Clear specific user view when nav changes
+      setSelectedUserProfile(null); 
       setSearchQuery('');
   };
 
@@ -810,7 +764,6 @@ const App: React.FC = () => {
     <div className="min-h-screen text-slate-900 font-sans selection:bg-purple-200 selection:text-purple-900 relative overflow-x-hidden">
       <Toast toasts={toasts} removeToast={removeToast} />
       
-      {/* Floating Navigation */}
       <nav className="fixed top-6 inset-x-0 mx-auto w-fit z-[100] glass-panel shadow-2xl shadow-purple-900/10 rounded-full px-3 py-2 flex justify-center items-center gap-1 transition-all duration-300 max-w-[95%] animate-fade-up">
         <button onClick={() => handleNavChange('All')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'All' && !selectedUserProfile ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>All</button>
         {currentUser && <button onClick={() => handleNavChange('My Gallery')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 ${activeNav === 'My Gallery' && !selectedUserProfile ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'}`}>My Gallery</button>}
@@ -819,7 +772,6 @@ const App: React.FC = () => {
           <Users size={16}/> <span className="hidden sm:inline">Creators</span>
         </button>
 
-        {/* Added Policy Links to Nav for AdSense Compliance */}
         <div className="hidden lg:flex items-center gap-1 mx-2">
             <button onClick={() => setActiveModal('about')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">About</button>
             <button onClick={() => setActiveModal('privacy')} className="px-3 py-2 rounded-full text-xs font-bold text-slate-500 hover:text-purple-600 hover:bg-white/50 transition-all">Privacy</button>
@@ -856,7 +808,6 @@ const App: React.FC = () => {
         )}
       </nav>
 
-      {/* Header - Only Show on Main Feed */}
       {!selectedUserProfile && (
         <Header 
             config={headerConfig} 
@@ -866,10 +817,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Main Container - Adjusted padding top when header is hidden */}
       <main className={`max-w-[1400px] mx-auto px-4 md:px-8 ${selectedUserProfile ? 'pt-32 pb-12' : 'py-12'} animate-in fade-in slide-in-from-bottom-8 duration-700`}>
         
-        {/* User Profile View Header */}
         {selectedUserProfile && (
             <div className="mb-12 animate-fade-up">
                  <button onClick={() => setSelectedUserProfile(null)} className="mb-8 flex items-center gap-2 px-4 py-2 bg-white rounded-full font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm active:scale-95">
@@ -877,10 +826,8 @@ const App: React.FC = () => {
                  </button>
                  
                  <div className="bg-white/60 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 md:p-12 shadow-xl flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12 relative overflow-hidden group">
-                     {/* Decorative background blur */}
                      <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
-                     {/* Profile Share Button */}
                      <button 
                          onClick={() => handleShare()}
                          className="absolute top-8 right-8 p-3 bg-white/50 hover:bg-white rounded-full text-slate-500 hover:text-purple-600 transition-all shadow-sm border border-slate-100/50"
@@ -928,11 +875,9 @@ const App: React.FC = () => {
             </div>
         )}
 
-        {/* Story Tray (Only on main feed) */}
         {!selectedUserProfile && (
             <div className="mb-12 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 md:mx-0 md:px-0 reveal">
             <div className="flex gap-4 min-w-max">
-                {/* My Story (Add) - Only visible in My Gallery */}
                 {activeNav === 'My Gallery' && (
                     <div 
                         className="flex flex-col items-center gap-2 cursor-pointer group" 
@@ -957,14 +902,13 @@ const App: React.FC = () => {
                     </div>
                 )}
 
-                {/* Other Stories */}
                 {activeStories.map((story, index) => {
                 const isWatched = watchedStories.includes(story.id);
                 return (
                     <div key={story.id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => handleStoryOpen(index)}>
                     <div className={`w-20 h-20 rounded-full p-[3px] group-hover:scale-110 transition-transform duration-500 ${isWatched ? 'bg-slate-200' : 'bg-gradient-to-tr from-yellow-400 via-orange-500 to-fuchsia-600 animate-[spin_10s_linear_infinite] hover:animate-none'}`}>
                         <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white relative">
-                            <img src={story.imageUrl} className="w-full h-full object-cover" />
+                            <img src={story.imageUrl} className="w-full h-full object-cover" loading="lazy" />
                         </div>
                     </div>
                     <span className="text-xs font-semibold text-slate-600 max-w-[80px] truncate group-hover:text-slate-900 transition-colors">{story.author.split(' ')[0]}</span>
@@ -975,7 +919,6 @@ const App: React.FC = () => {
             </div>
         )}
 
-        {/* Leaderboard Ad */}
         <div className="w-full flex justify-center mb-16 reveal">
           <GoogleAd 
             className="w-full max-w-[970px] h-[90px] md:h-[250px] shadow-sm hover:shadow-lg transition-shadow duration-500" 
@@ -984,7 +927,6 @@ const App: React.FC = () => {
           />
         </div>
 
-        {/* Main Content Area */}
         <div className="w-full">
             <div className="mb-10">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 reveal">
@@ -998,7 +940,6 @@ const App: React.FC = () => {
                         : (activeNav === 'My Gallery' ? 'Manage your personal uploads.' : 'Discover inspiring work from creators worldwide.')}
                     </p>
                 </div>
-                {/* View Toggle */}
                 {activeNav !== 'Stories' && (
                     <div className="flex bg-white/50 backdrop-blur-md rounded-2xl p-1 border border-white shadow-sm hover:shadow-md transition-shadow">
                         <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all active:scale-95 ${viewMode === 'grid' ? 'bg-white shadow-md text-purple-600' : 'text-slate-400 hover:text-slate-600'}`}><Grid size={20}/></button>
@@ -1015,7 +956,6 @@ const App: React.FC = () => {
                     onSelectUser={handleUserSelect}
                 />
                 
-                {/* Categories Filter Bar */}
                 {activeNav !== 'Stories' && (
                     <div className="flex overflow-x-auto pb-4 gap-3 no-scrollbar items-center">
                         {['All', 'Photography', 'Art', 'Design', 'Tech', 'Lifestyle'].map((cat, idx) => (
@@ -1037,7 +977,6 @@ const App: React.FC = () => {
             </div>
             </div>
 
-            {/* In-feed Ad */}
             {!selectedUserProfile && (
                 <div className="reveal">
                     <GoogleAd className="w-full h-[120px] mb-12 shadow-sm" slot="0987654321" format="horizontal" />
@@ -1068,7 +1007,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* SEO / Publisher Content Section for AdSense */}
       {!selectedUserProfile && (
         <section className="w-full bg-white border-y border-slate-100 py-16 reveal">
             <div className="max-w-4xl mx-auto px-6 prose prose-lg prose-slate text-slate-600">
@@ -1076,21 +1014,10 @@ const App: React.FC = () => {
                 <p>
                     Creative Space is more than just a digital gallery; it is a global ecosystem designed to connect, inspire, and elevate artists from every corner of the world. In an era where visual content dominates communication, having a dedicated platform that prioritizes quality, aesthetic integrity, and community engagement is essential. Our mission is to bridge the gap between emerging talent and global recognition, providing a seamless interface where photographers, digital artists, and designers can showcase their portfolios in high definition.
                 </p>
-                
-                <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">A Curated Sanctuary for Digital Art</h3>
-                <p>
-                    Unlike traditional social media platforms where content is fleeting, Creative Space focuses on the longevity and impact of visual art. Our curation algorithms and community-driven filtering ensure that every visit provides a fresh dose of inspiration. From the raw emotion of analog photography to the precision of modern 3D rendering and the fluidity of motion graphics, our gallery encompasses a diverse spectrum of creative disciplines. We believe that art should not be confined by borders, which is why our infrastructure is built to support creators from Dhaka to New York, ensuring fast, responsive access to high-resolution media regardless of location.
-                </p>
-
-                <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Technology Meets Creativity</h3>
-                <p>
-                    Built with cutting-edge web technologies, Creative Space offers a fluid, app-like experience directly in the browser. We utilize advanced image optimization, responsive grid layouts, and immersive lightbox features to present artwork as the artist intended. Our commitment to user experience extends to privacy and security, ensuring that while we foster open sharing, we also protect the intellectual property and personal data of our users. Whether you are a professional seeking a portfolio solution or an enthusiast looking for daily inspiration, Creative Space provides the tools and environment necessary to thrive in the digital creative economy.
-                </p>
             </div>
         </section>
       )}
 
-      {/* Footer Ad */}
       <div className="max-w-[1200px] mx-auto px-4 mb-8 reveal">
         <GoogleAd className="w-full h-[200px]" slot="5555555555" format="auto" />
       </div>
@@ -1098,69 +1025,39 @@ const App: React.FC = () => {
       <footer className="bg-slate-50 border-t border-slate-200 pt-20 pb-12 reveal">
         <div className="max-w-7xl mx-auto px-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-                {/* Brand Column */}
                 <div className="col-span-1 md:col-span-1">
                     <h3 className="text-3xl font-black gradient-text mb-4 inline-block">{headerConfig.title}</h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed mb-6">
                         Empowering creators worldwide to share their vision. Join the global community of visual storytellers today.
                     </p>
-                    <div className="flex gap-4">
-                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-purple-600 hover:scale-110 transition-all shadow-sm border border-slate-100">
-                            <Twitter size={18} />
-                        </a>
-                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-pink-600 hover:scale-110 transition-all shadow-sm border border-slate-100">
-                            <Instagram size={18} />
-                        </a>
-                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-blue-600 hover:scale-110 transition-all shadow-sm border border-slate-100">
-                            <Linkedin size={18} />
-                        </a>
-                        <a href="#" className="p-2 bg-white rounded-full text-slate-400 hover:text-blue-800 hover:scale-110 transition-all shadow-sm border border-slate-100">
-                            <Facebook size={18} />
-                        </a>
-                    </div>
                 </div>
 
-                {/* Company Column */}
                 <div>
                     <h4 className="font-bold text-slate-900 text-lg mb-6">Company</h4>
                     <ul className="space-y-3 text-sm font-medium text-slate-500">
                         <li><button onClick={() => setActiveModal('about')} className="hover:text-purple-600 transition-colors">About Us</button></li>
                         <li><a href="#" className="hover:text-purple-600 transition-colors">Careers</a></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Blog</a></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Press Kit</a></li>
                     </ul>
                 </div>
 
-                {/* Legal Column */}
                 <div>
                     <h4 className="font-bold text-slate-900 text-lg mb-6">Legal</h4>
                     <ul className="space-y-3 text-sm font-medium text-slate-500">
                         <li><button onClick={() => setActiveModal('privacy')} className="hover:text-purple-600 transition-colors">Privacy Policy</button></li>
                         <li><button onClick={() => setActiveModal('terms')} className="hover:text-purple-600 transition-colors">Terms of Service</button></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Cookie Policy</a></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Copyright</a></li>
                     </ul>
                 </div>
 
-                {/* Support Column */}
                 <div>
                     <h4 className="font-bold text-slate-900 text-lg mb-6">Support</h4>
                     <ul className="space-y-3 text-sm font-medium text-slate-500">
                         <li><button onClick={() => setActiveModal('contact')} className="hover:text-purple-600 transition-colors">Contact Us</button></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Help Center</a></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Community Guidelines</a></li>
-                        <li><a href="#" className="hover:text-purple-600 transition-colors">Report Abuse</a></li>
                     </ul>
                 </div>
             </div>
 
             <div className="pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2025 Creative Space Studio. All rights reserved.</p>
-                <div className="flex gap-6 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    <span>Dhaka, Bangladesh</span>
-                    <span>•</span>
-                    <span>English (US)</span>
-                </div>
             </div>
         </div>
       </footer>
@@ -1190,35 +1087,32 @@ const App: React.FC = () => {
         currentUser={currentUser}
       />
       
-      {/* Immersive Story Viewer */}
-      {viewingStoryIndex !== null && (
-        <StoryViewer 
-            stories={activeStories} 
-            initialIndex={viewingStoryIndex} 
-            onClose={() => setViewingStoryIndex(null)}
-            onReadMore={(story) => {
-                setViewingStoryIndex(null);
-                setActiveStory(story);
-            }}
-            currentUser={currentUser}
-            onDelete={handleDeleteStory}
-            onUpdate={handleUpdateStory}
-        />
-      )}
+      {/* Wrapped Suspense components for code splitting */}
+      <Suspense fallback={<div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/50 backdrop-blur-sm"><Loader2 className="animate-spin text-white w-10 h-10"/></div>}>
+          {viewingStoryIndex !== null && (
+            <StoryViewer 
+                stories={activeStories} 
+                initialIndex={viewingStoryIndex} 
+                onClose={() => setViewingStoryIndex(null)}
+                onReadMore={(story) => {
+                    setViewingStoryIndex(null);
+                    setActiveStory(story);
+                }}
+                currentUser={currentUser}
+                onDelete={handleDeleteStory}
+                onUpdate={handleUpdateStory}
+            />
+          )}
 
-      {/* Story Upload Modal */}
-      {showStoryUploadModal && tempStoryImg && (
-        <div className="fixed inset-0 z-[2000] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-           <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
-              <div className="p-6">
-                 <h3 className="text-2xl font-black text-slate-900 mb-6">New Story</h3>
-                 <div className="aspect-[9/16] w-32 rounded-xl overflow-hidden shadow-lg mx-auto mb-6 bg-slate-100 border border-slate-200">
-                    <img src={tempStoryImg} className="w-full h-full object-cover" />
-                 </div>
-                 
-                 <div className="space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Title / Caption</label>
+          {showStoryUploadModal && tempStoryImg && (
+            <div className="fixed inset-0 z-[2000] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+               <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
+                  <div className="p-6">
+                     <h3 className="text-2xl font-black text-slate-900 mb-6">New Story</h3>
+                     <div className="aspect-[9/16] w-32 rounded-xl overflow-hidden shadow-lg mx-auto mb-6 bg-slate-100 border border-slate-200">
+                        <img src={tempStoryImg} className="w-full h-full object-cover" />
+                     </div>
+                     <div className="space-y-4">
                         <input 
                            value={newStoryTitle}
                            onChange={e => setNewStoryTitle(e.target.value)}
@@ -1226,101 +1120,72 @@ const App: React.FC = () => {
                            placeholder="Add a caption..."
                            autoFocus
                         />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">Link (Optional)</label>
-                        <div className="relative">
-                            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input 
-                               value={newStoryLink}
-                               onChange={e => setNewStoryLink(e.target.value)}
-                               className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-purple-500 outline-none font-medium text-sm transition-all focus:ring-4 focus:ring-purple-500/10"
-                               placeholder="https://..."
-                            />
-                        </div>
-                    </div>
-                 </div>
+                     </div>
+                     <div className="flex gap-3 mt-8">
+                         <button onClick={finalizeStoryUpload} className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-purple-200 active:scale-95"><Check size={18}/> Post Story</button>
+                         <button onClick={() => {setShowStoryUploadModal(false); setTempStoryImg(null);}} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-95"><X size={18}/> Cancel</button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
 
-                 <div className="flex gap-3 mt-8">
-                     <button onClick={finalizeStoryUpload} className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-purple-200 active:scale-95"><Check size={18}/> Post Story</button>
-                     <button onClick={() => {setShowStoryUploadModal(false); setTempStoryImg(null);}} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 active:scale-95"><X size={18}/> Cancel</button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
+          {activeStory && (
+            <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-in slide-in-from-bottom-10 duration-500">
+               <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex justify-between items-center z-10">
+                  <button onClick={() => setActiveStory(null)} className="flex items-center gap-2 font-bold text-slate-600 hover:text-purple-600 bg-slate-50 px-4 py-2 rounded-full hover:bg-purple-50 transition-colors active:scale-95"><ArrowLeft size={20}/> Back</button>
+               </div>
+               <article className="max-w-3xl mx-auto px-6 py-16 animate-fade-up">
+                  <h1 className="text-5xl md:text-6xl font-black text-slate-900 mb-8 leading-tight">{activeStory.title}</h1>
+                  {activeStory.imageUrl && <img src={activeStory.imageUrl} className="w-full rounded-[2.5rem] shadow-2xl mb-12" loading="lazy" decoding="async" />}
+                  <div className="prose prose-xl prose-slate mx-auto">
+                    <p className="text-2xl text-slate-600 font-medium leading-relaxed mb-8">{activeStory.excerpt}</p>
+                    <div dangerouslySetInnerHTML={{ __html: activeStory.content || '' }} />
+                  </div>
+               </article>
+            </div>
+          )}
 
-      {/* Story Reader Modal (Long Form) */}
-      {activeStory && (
-        <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-in slide-in-from-bottom-10 duration-500">
-           <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex justify-between items-center z-10">
-              <button onClick={() => setActiveStory(null)} className="flex items-center gap-2 font-bold text-slate-600 hover:text-purple-600 bg-slate-50 px-4 py-2 rounded-full hover:bg-purple-50 transition-colors active:scale-95"><ArrowLeft size={20}/> Back</button>
-              <div className="flex gap-2"><button className="p-3 rounded-full bg-slate-50 hover:bg-pink-50 hover:text-pink-500 transition-all hover:scale-110 active:scale-90"><Heart size={20}/></button></div>
-           </div>
-           <article className="max-w-3xl mx-auto px-6 py-16 animate-fade-up">
-              <div className="flex gap-3 mb-6">
-                {activeStory.tags?.map(tag => (
-                    <span key={tag} className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase">{tag}</span>
-                ))}
-              </div>
-              <h1 className="text-5xl md:text-6xl font-black text-slate-900 mb-8 leading-tight">{activeStory.title}</h1>
-              {activeStory.imageUrl && <img src={activeStory.imageUrl} className="w-full rounded-[2.5rem] shadow-2xl mb-12 hover:scale-[1.01] transition-transform duration-700" />}
-              <div className="prose prose-xl prose-slate mx-auto">
-                <p className="text-2xl text-slate-600 font-medium leading-relaxed mb-8">{activeStory.excerpt}</p>
-                <div dangerouslySetInnerHTML={{ __html: activeStory.content || '' }} />
-              </div>
-           </article>
-        </div>
-      )}
+          {activeModal === 'auth' && (
+            <AuthModal 
+              initialMode={authMode}
+              onClose={() => setActiveModal(null)}
+              onLogin={onEmailLogin}
+              onRegister={onEmailRegister}
+              onGoogleLogin={onGoogleLogin}
+            />
+          )}
 
-      {/* Auth Modal (New) */}
-      {activeModal === 'auth' && (
-        <AuthModal 
-          initialMode={authMode}
-          onClose={() => setActiveModal(null)}
-          onLogin={onEmailLogin}
-          onRegister={onEmailRegister}
-          onGoogleLogin={onGoogleLogin}
-        />
-      )}
+          {activeModal === 'profile' && currentUser && (
+            <ProfileSettings 
+                user={currentUser}
+                onClose={() => setActiveModal(null)}
+                onSave={handleUpdateProfile}
+            />
+          )}
 
-      {/* Profile Settings Modal */}
-      {activeModal === 'profile' && currentUser && (
-        <ProfileSettings 
-            user={currentUser}
-            onClose={() => setActiveModal(null)}
-            onSave={handleUpdateProfile}
-        />
-      )}
+          {activeModal === 'privacy' && <PrivacyPolicy onClose={() => setActiveModal(null)} />}
+          {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
+          {activeModal === 'contact' && <ContactModal onClose={() => setActiveModal(null)} />}
+          {activeModal === 'terms' && <TermsModal onClose={() => setActiveModal(null)} />}
+          
+          {activeModal === 'userSearch' && (
+            <UserSearchModal 
+                users={allUsers}
+                onClose={() => setActiveModal(null)}
+                onSelect={handleUserSelect}
+            />
+          )}
 
-      {/* Privacy Policy Modal */}
-      {activeModal === 'privacy' && (
-        <PrivacyPolicy onClose={() => setActiveModal(null)} />
-      )}
-      
-      {/* New Modals */}
-      {activeModal === 'about' && <AboutModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'contact' && <ContactModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'terms' && <TermsModal onClose={() => setActiveModal(null)} />}
-      
-      {/* User Search Modal */}
-      {activeModal === 'userSearch' && (
-        <UserSearchModal 
-            users={allUsers}
-            onClose={() => setActiveModal(null)}
-            onSelect={handleUserSelect}
-        />
-      )}
-
-      {/* Share Modal */}
-      {shareData && (
-        <ShareModal 
-            url={shareData.url}
-            title={shareData.title}
-            text={shareData.text}
-            onClose={() => setShareData(null)}
-        />
-      )}
+          {shareData && (
+            <ShareModal 
+                url={shareData.url}
+                title={shareData.title}
+                text={shareData.text}
+                onClose={() => setShareData(null)}
+            />
+          )}
+      </Suspense>
     </div>
   );
 };
