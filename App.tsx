@@ -6,7 +6,7 @@ import Toast from './components/Toast';
 import SearchBar from './components/SearchBar';
 import GoogleAd from './components/GoogleAd';
 import { MediaItem, ToastMessage, HeaderConfig, User, BlogPostData, Comment } from './types';
-import { LogOut, ArrowLeft, Heart, Grid, List, Plus, Settings, Link as LinkIcon, Check, X, Twitter, Instagram, Linkedin, Facebook, MapPin, Globe, User as UserIcon, Users, Share2, Loader2 } from 'lucide-react';
+import { LogOut, ArrowLeft, Grid, List, Plus, Settings, Check, X, MapPin, Globe, User as UserIcon, Users, Share2, Loader2 } from 'lucide-react';
 import { saveMediaItemToDB, getMediaItemsFromDB, deleteMediaItemFromDB, saveConfigToDB, getConfigFromDB, deleteUserMediaFromDB, authenticateUser, updateUser, saveUserToDB, getAllUsers } from './db';
 
 // Lazy Load Heavy Modals for Performance
